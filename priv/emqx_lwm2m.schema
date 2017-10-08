@@ -1,0 +1,18 @@
+{mapping, "lwm2m.port", "emqx_lwm2m.port", [
+  {datatype, integer}
+]}.
+
+
+{mapping, "lwm2m.keyfile", "emqx_lwm2m.keyfile", [
+  {datatype, string}
+]}.
+
+{mapping, "lwm2m.certfile", "emqx_lwm2m.certfile", [
+  {datatype, string}
+]}.
+
+{mapping, "lwm2m.xml_dir", "emqx_lwm2m.xml_dir", [
+  {datatype, string}
+]}.
+
+
