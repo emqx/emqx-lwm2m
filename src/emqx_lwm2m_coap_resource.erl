@@ -19,10 +19,12 @@
 -author("Feng Lee <feng@emqtt.io>").
 
 -include_lib("emqx/include/emqx.hrl").
--include_lib("emqx/include/emqx_mqtt.hrl").
--include_lib("emqx/include/emqx_macros.hrl").
--include_lib("lwm2m_coap/include/coap.hrl").
 
+-include_lib("emqx/include/emqx_mqtt.hrl").
+
+-include_lib("emqx/include/emqx_internal.hrl").
+
+-include_lib("lwm2m_coap/include/coap.hrl").
 
 -behaviour(lwm2m_coap_resource).
 

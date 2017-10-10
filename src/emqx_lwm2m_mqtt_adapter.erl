@@ -21,10 +21,12 @@
 -behaviour(gen_server).
 
 -include("emqx_lwm2m.hrl").
--include_lib("emqx/include/emqx.hrl").
--include_lib("emqx/include/emqx_mqtt.hrl").
--include_lib("emqx/include/emqx_macros.hrl").
 
+-include_lib("emqx/include/emqx.hrl").
+
+-include_lib("emqx/include/emqx_mqtt.hrl").
+
+-include_lib("emqx/include/emqx_internal.hrl").
 
 %% API.
 -export([start_link/4, publish/5, keepalive/1, new_keepalive_interval/2]).

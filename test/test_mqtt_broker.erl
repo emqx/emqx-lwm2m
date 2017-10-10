@@ -25,8 +25,11 @@
 -record(state, {subscriber}).
 
 -include_lib("emqx/include/emqx.hrl").
+
 -include_lib("emqx/include/emqx_mqtt.hrl").
--include_lib("emqx/include/emqx_macros.hrl").
+
+-include_lib("emqx/include/emqx_internal.hrl").
+
 -include_lib("eunit/include/eunit.hrl").
 
 start(_, <<"attacker">>, _, _, _) ->
