@@ -33,7 +33,7 @@ start(_Type, _Args) ->
 
 prep_stop(State) ->
     emqx_lwm2m_coap_server:stop(),
-    emqx_lwm2m_config:unregister(),
+    emqx_lwm2m_cfg:unregister(),
     State.
 
 stop(_State) ->

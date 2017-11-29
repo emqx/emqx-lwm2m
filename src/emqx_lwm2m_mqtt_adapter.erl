@@ -110,7 +110,7 @@ handle_call(info, From, State = #state{proto = ProtoState, peer = Channel}) ->
     {reply, lists:append([ClientInfo, ProtoInfo, Stats]), State};
 
 handle_call(stats, _From, State = #state{proto = ProtoState}) ->
-    {reply, lists:append([emqttd_misc:proc_stats(), emqx_protocol:stats(ProtoState)]), State};
+    {reply, lists:append([emqx_misc:proc_stats(), emqx_protocol:stats(ProtoState)]), State};
 
 handle_call(kick, _From, State) ->
     {stop, {shutdown, kick}, ok, State};
