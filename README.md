@@ -11,6 +11,55 @@ User is able to send LWM2M commands(READ/WRITE/EXECUTE/...) and get LWM2M respon
 emqx_lwm2m needs object definitions to parse data from lwm2m devices. Object definitions are declared by organisitions in XML format, you can find those XMLs [here](http://www.openmobilealliance.org/wp/OMNA/LwM2M/LwM2MRegistry.html). Please download required XMLs and put them into directory specified by lwm2m.xml_dir. If no associated object definition is found, response from device will be discarded and report an error message in system log.
 
 
+
+
+Client
+------
+wakaama is an easy-to-read lwm2m client tool.
+
+
+Download source code:
+
+```
+git clone https://github.com/eclipse/wakaama
+```
+
+Modify wakaama/examples/lightclient/object_security.c, replace uri with appropriate value:
+
+```
+targetP->uri = strdup("coap://localhost:5783");
+```
+
+Compile wakaama:
+
+```
+mkdir build_wakaama
+cd build_wakaama
+cmake -DCMAKE_BUILD_TYPE=Debug ../wakaama/examples/lightclient
+make
+```
+
+Run
+
+```
+build_wakaama/lightclient -4 -n testclient
+```
+
+
+Subscribe topic "lwm2m/testclient/response" through a mqtt client, for example, mqtt.fx:
+
+
+Send a lwm2m DISCOVER command through mqtt.fx:
+- topic is "lwm2m/testclient/command"
+- payload is {"CmdID":5,"Command":"Discover","BaseName":"/3/0"}
+
+The wakaama lightclient will get a DISCOVER command and return a response.
+The mqtt.fx will receive following result:
+```
+{"CmdID":5,"Command":"Discover","Result":"</3/0>,</3/0/0>,</3/0/1>,</3/0/16>,</3/0/4>"}
+```
+
+
 Configure Plugin
 ----------------
 
@@ -58,6 +107,7 @@ Downlink message payload
 ```
 - {?CmdId} is an integer to pair command and response.
 - {?BaseName} is a string identify object and resource, please refer to OMA-TS-LightweightM2M-V1_0-20170208-A.pdf section 6.4.4 JSON.
+- If json format has error, this command will be ignored without any response.
 
 Uplink Response payload
 
@@ -95,6 +145,7 @@ Downlink command payload
 ```
 - {?CmdID}, an integer to identify a command response against its request.
 - {?JsonValue} is the json presentation of LWM2M data, please refer to OMA-TS-LightweightM2M-V1_0-20170208-A.pdf section 6.4.4 JSON.
+- If json format has error, this command will be ignored without any response.
 
 
 Uplink response payload
@@ -135,6 +186,7 @@ Downlink message payload
 - {?CmdId} is an integer to pair command and response.
 - {?BaseName} is a string identify object and resource, please refer to OMA-TS-LightweightM2M-V1_0-20170208-A.pdf section 6.4.4 JSON.
 - {?Args} is a string. Please refer to OMA-TS-LightweightM2M-V1_0-20170208-A.pdf section 6.4.5 Execute.
+- If json format has error, this command will be ignored without any response.
 
 Uplink Response payload
 
@@ -171,6 +223,7 @@ Downlink command payload
 ```
 - {?CmdID}, an integer to identify a command response against its request.
 - {?BaseName} is a string identify object and resource, please refer to OMA-TS-LightweightM2M-V1_0-20170208-A.pdf section 6.4.4 JSON.
+- If json format has error, this command will be ignored without any response.
 
 
 Uplink response payload
@@ -212,6 +265,7 @@ Downlink command payload
 - {?CmdID}, an integer to identify a command response against its request.
 - {?BaseName} is a string identify object and resource, please refer to OMA-TS-LightweightM2M-V1_0-20170208-A.pdf section 6.4.4 JSON.
 - {?Value} is a string in following format:
+- If json format has error, this command will be ignored without any response.
 
 ```
 pmin={minimum_period}&pmax={maximum_period}&gt={greater_than}&lt={less_than}&st={step}
@@ -292,7 +346,6 @@ or
 ## NOTES
 - emqx_lwm2m implements LWM2M server, which does not include LWM2M bootstrap server. 
 - emqx_lwm2m supports UDP binding, no SMS binding yet.
-- emqx_lwm2m does not support 
 - Fireware object is not fully supported now since mqtt to coap blockwise transfer is not available.
 - Object Versioning is not supported now.
 
@@ -303,36 +356,6 @@ emqx-lwm2m support DTLS to secure UDP data.
 
 Please config lwm2m.certfile and lwm2m.keyfile in emqx_lwm2m.conf. If certfile or keyfile are invalid, DTLS will be turned off and you could read a error message in system log.
 
-## Client
-wakaama is an easy-to-read lwm2m client tool.
-
-
-Download source code:
-
-```
-git clone https://github.com/eclipse/wakaama
-```
-
-Modify wakaama/examples/lightclient/object_security.c, replace uri with appropriate value:
-
-```
-targetP->uri = strdup("coap://localhost:5783");
-```
-
-Compile wakaama:
-
-```
-mkdir build_wakaama
-cd build_wakaama 
-cmake -DCMAKE_BUILD_TYPE=Debug ../wakaama/examples/lightclient 
-make
-```
-
-Run
-
-```
-build_wakaama/lightclient -4 -n testclient
-```
 
 
 License
