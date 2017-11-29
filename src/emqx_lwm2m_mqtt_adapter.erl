@@ -278,9 +278,14 @@ proto_deliver_ack(#mqtt_message{qos = ?QOS2, pktid = PacketId}, Proto) ->
 
 deliver_to_coap(JsonData, CoapPid) ->
     ?LOG(debug, "deliver_to_coap CoapPid=~p (alive=~p), JsonData=~p", [CoapPid, is_process_alive(CoapPid), JsonData]),
-    Command = jsx:decode(JsonData, [return_maps]),
-    {CoapRequest, Ref} = emqx_lwm2m_cmd_handler:mqtt_payload_to_coap_request(Command),
-    CoapPid ! {dispatch_command, CoapRequest, Ref}.
+    case (catch jsx:decode(JsonData, [return_maps])) of
+        {'EXIT', _} ->
+            ?LOG(error, "downlink request has json format error, json=~p", [JsonData]),
+            ignore;
+        Command     ->
+            {CoapRequest, Ref} = emqx_lwm2m_cmd_handler:mqtt_payload_to_coap_request(Command),
+            CoapPid ! {dispatch_command, CoapRequest, Ref}
+    end.
 
 
 
