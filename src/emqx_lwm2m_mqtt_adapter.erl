@@ -23,7 +23,7 @@
 -include("emqx_lwm2m.hrl").
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("emqx/include/emqx_mqtt.hrl").
--include_lib("emqx/include/emqx_macros.hrl").
+-include_lib("emqx/include/emqx_internal.hrl").
 
 
 %% API.

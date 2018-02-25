@@ -20,7 +20,7 @@
 
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("emqx/include/emqx_mqtt.hrl").
--include_lib("emqx/include/emqx_macros.hrl").
+-include_lib("emqx/include/emqx_internal.hrl").
 -include_lib("lwm2m_coap/include/coap.hrl").
 
 
