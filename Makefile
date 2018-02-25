@@ -1,6 +1,6 @@
 PROJECT = emqx_lwm2m
-PROJECT_DESCRIPTION = EMQ X LWM2M Gateway
-PROJECT_VERSION = 0.1
+PROJECT_DESCRIPTION = EMQ X LwM2M Gateway
+PROJECT_VERSION = 0.1.1
 
 DEPS = lager lwm2m_coap jsx clique
 dep_lager      = git https://github.com/basho/lager
@@ -9,10 +9,10 @@ dep_jsx        = git https://github.com/talentdeficit/jsx
 dep_clique     = git https://github.com/emqtt/clique
 
 BUILD_DEPS = emqx cuttlefish
-dep_emqx     = git https://github.com/emqtt/emqttd X
+dep_emqx     = git https://github.com/emqtt/emqttd emqx30
 dep_cuttlefish = git https://github.com/emqtt/cuttlefish
 
-ERLC_OPTS += +debug_info
+ERLC_OPTS += +debug_inf
 ERLC_OPTS += +'{parse_transform, lager_transform}'
 TEST_ERLC_OPTS += +'{parse_transform, lager_transform}'
 
