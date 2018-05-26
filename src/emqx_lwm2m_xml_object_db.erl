@@ -1,28 +1,25 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2016-2017 EMQ Enterprise, Inc. (http://emqtt.io)
-%%
-%% Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
-%%--------------------------------------------------------------------
--module(emqx_lwm2m_xml_object_db).
+%%%===================================================================
+%%% Copyright (c) 2013-2018 EMQ Inc. All rights reserved.
+%%%
+%%% Licensed under the Apache License, Version 2.0 (the "License");
+%%% you may not use this file except in compliance with the License.
+%%% You may obtain a copy of the License at
+%%%
+%%%     http://www.apache.org/licenses/LICENSE-2.0
+%%%
+%%% Unless required by applicable law or agreed to in writing, software
+%%% distributed under the License is distributed on an "AS IS" BASIS,
+%%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%%% See the License for the specific language governing permissions and
+%%% limitations under the License.
+%%%===================================================================
 
--author("Feng Lee <feng@emqtt.io>").
+-module(emqx_lwm2m_xml_object_db).
 
 -include("emqx_lwm2m.hrl").
 -include_lib("xmerl/include/xmerl.hrl").
 
-
 % This module is for future use. Disabled now.
-
 
 %% API
 -export([start_link/0, stop/0, find_name/1, find_objectid/1]).
@@ -32,7 +29,7 @@
     terminate/2, code_change/3]).
 
 -define(LOG(Level, Format, Args),
-    lager:Level("LWM2M-OBJ-DB: " ++ Format, Args)).
+        emqx_logger:Level("LWM2M-OBJ-DB: " ++ Format, Args)).
 
 -define(LWM2M_OBJECT_DEF_TAB, lwm2m_object_def_tab).
 -define(LWM2M_OBJECT_NAME_TO_ID_TAB, lwm2m_object_name_to_id_tab).

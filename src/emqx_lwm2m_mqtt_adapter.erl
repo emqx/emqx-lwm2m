@@ -1,30 +1,26 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2016-2017 EMQ Enterprise, Inc. (http://emqtt.io)
-%%
-%% Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
-%%--------------------------------------------------------------------
+%%%===================================================================
+%%% Copyright (c) 2013-2018 EMQ Inc. All rights reserved.
+%%%
+%%% Licensed under the Apache License, Version 2.0 (the "License");
+%%% you may not use this file except in compliance with the License.
+%%% You may obtain a copy of the License at
+%%%
+%%%     http://www.apache.org/licenses/LICENSE-2.0
+%%%
+%%% Unless required by applicable law or agreed to in writing, software
+%%% distributed under the License is distributed on an "AS IS" BASIS,
+%%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%%% See the License for the specific language governing permissions and
+%%% limitations under the License.
+%%%===================================================================
 
 -module(emqx_lwm2m_mqtt_adapter).
-
--author("Feng Lee <feng@emqtt.io>").
 
 -behaviour(gen_server).
 
 -include("emqx_lwm2m.hrl").
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("emqx/include/emqx_mqtt.hrl").
--include_lib("emqx/include/emqx_internal.hrl").
-
 
 %% API.
 -export([start_link/4, publish/5, keepalive/1, new_keepalive_interval/2]).
@@ -220,11 +216,11 @@ proto_init(ClientId, Username, Password, Channel, KeepAliveInterval) ->
     SendFun = fun(_Packet) -> ok end,
     PktOpts = [{max_clientid_len, 96}, {max_packet_size, 512}],
     Proto = emqx_protocol:init(Channel, SendFun, PktOpts),
-    ConnPkt = #mqtt_packet_connect{client_id  = ClientId,
-                                   username   = Username,
-                                   password   = Password,
-                                   clean_sess = true,
-                                   keep_alive = KeepAliveInterval},
+    ConnPkt = #mqtt_packet_connect{client_id   = ClientId,
+                                   username    = Username,
+                                   password    = Password,
+                                   clean_start = true,
+                                   keepalive   = KeepAliveInterval},
     case emqx_protocol:received(?CONNECT_PACKET(ConnPkt), Proto) of
         {ok, Proto1}                              -> {ok, Proto1};
         {stop, {shutdown, auth_failure}, _Proto2} -> {stop, auth_failure};
@@ -255,21 +251,21 @@ proto_publish(Topic, Payload, Proto) ->
         Other         -> error(Other)
     end.
 
-proto_deliver_ack(#mqtt_message{qos = ?QOS0, pktid = _PacketId}, Proto) ->
+proto_deliver_ack(#mqtt_message{qos = ?QOS0, packet_id = _PacketId}, Proto) ->
     Proto;
-proto_deliver_ack(#mqtt_message{qos = ?QOS1, pktid = PacketId}, Proto) ->
-    case emqx_protocol:received(?PUBACK_PACKET(?PUBACK, PacketId), Proto) of
+proto_deliver_ack(#mqtt_message{qos = ?QOS1, packet_id = PacketId}, Proto) ->
+    case emqx_protocol:received(?PUBACK_PACKET(PacketId), Proto) of
         {ok, NewProto} -> NewProto;
         Other          -> error(Other)
     end;
-proto_deliver_ack(#mqtt_message{qos = ?QOS2, pktid = PacketId}, Proto) ->
-    case emqx_protocol:received(?PUBACK_PACKET(?PUBREC, PacketId), Proto) of
+proto_deliver_ack(#mqtt_message{qos = ?QOS2, packet_id = PacketId}, Proto) ->
+    case emqx_protocol:received(?PUBREC_PACKET(PacketId), Proto) of
         {ok, NewProto} ->
-            case emqx_protocol:received(?PUBACK_PACKET(?PUBCOMP, PacketId), NewProto) of
+            case emqx_protocol:received(?PUBCOMP_PACKET(PacketId), NewProto) of
                 {ok, CurrentProto} -> CurrentProto;
                 Another            -> error(Another)
             end;
-        Other          -> error(Other)
+        Other -> error(Other)
     end.
 
 
