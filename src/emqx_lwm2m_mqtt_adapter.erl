@@ -29,79 +29,68 @@
 -include_lib("emqx/include/emqx_internal.hrl").
 
 %% API.
--export([start_link/4, publish/5, keepalive/1, new_keepalive_interval/2]).
+-export([start_link/4, send_ul_data/3, update_reg_info/2, replace_reg_info/2]).
 -export([stop/1]).
 
 %% gen_server.
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
     terminate/2, code_change/3]).
 
--record(state, {proto, peer, keepalive_interval, keepalive, coap_pid, rsp_topic, sub_topic}).
+-record(state, {proto, peer, life_timer, coap_pid, sub_topic, reg_info}).
 
 -define(DEFAULT_KEEP_ALIVE_DURATION,  60*2).
 
 -define(LOG(Level, Format, Args),
     lager:Level("LWM2M-MQTT: " ++ Format, Args)).
 
-
-
--ifdef(TEST).
--define(PROTO_INIT(A, B, C, D, E),      test_mqtt_broker:start(A, B, C, D, E)).
--define(PROTO_SUBSCRIBE(X, Y),          test_mqtt_broker:subscribe(X)).
--define(PROTO_UNSUBSCRIBE(X, Y),        test_mqtt_broker:unsubscribe(X)).
--define(PROTO_PUBLISH(A1, A2, P),       test_mqtt_broker:publish(A1, A2)).
--define(PROTO_DELIVER_ACK(A1, A2),      A2).
--define(PROTO_SHUTDOWN(A, B),           ok).
--else.
--define(PROTO_INIT(A, B, C, D, E),      proto_init(A, B, C, D, E)).
--define(PROTO_SUBSCRIBE(X, Y),          proto_subscribe(X, Y)).
--define(PROTO_UNSUBSCRIBE(X, Y),        proto_unsubscribe(X, Y)).
--define(PROTO_PUBLISH(A1, A2, P),       proto_publish(A1, A2, P)).
--define(PROTO_DELIVER_ACK(Msg, State),  proto_deliver_ack(Msg, State)).
--define(PROTO_SHUTDOWN(A, B),           emqx_protocol:shutdown(A, B)).
--endif.
-
+%% Protocol State, copied from emqx_protocol
+%% ws_initial_headers: Headers from first HTTP request for WebSocket Client.
+-record(proto_state, {peername, sendfun, connected = false, client_id, client_pid,
+                      clean_sess, proto_ver, proto_name, username, is_superuser,
+                      will_msg, keepalive, keepalive_backoff, max_clientid_len,
+                      session, stats_data, mountpoint, ws_initial_headers,
+                      peercert_username, is_bridge, connected_at, headers = [], proto, status}).
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
 
 
-start_link(CoapPid, ClientId, ChId, KeepAliveInterval) ->
-    gen_server:start_link({via, emqx_lwm2m_registry, ChId}, ?MODULE, {CoapPid, ClientId, ChId, KeepAliveInterval}, []).
+start_link(CoapPid, ClientId, ChId, RegInfo) ->
+    gen_server:start_link({via, emqx_lwm2m_registry, ChId}, ?MODULE, {CoapPid, ClientId, ChId, RegInfo}, []).
 
 stop(ChId) ->
     gen_server:stop(emqx_lwm2m_registry:whereis_name(ChId)).
 
-publish(ChId, Method, Response, DataFormat, Ref) ->
-    gen_server:call({via, emqx_lwm2m_registry, ChId}, {publish, Method, Response, DataFormat, Ref}).
+update_reg_info(ChId, RegInfo) ->
+    gen_server:cast({via, emqx_lwm2m_registry, ChId}, {update_reg_info, RegInfo}).
 
-keepalive(ChId)->
-    gen_server:cast({via, emqx_lwm2m_registry, ChId}, keepalive).
+replace_reg_info(ChId, RegInfo) ->
+    gen_server:cast({via, emqx_lwm2m_registry, ChId}, {replace_reg_info, RegInfo}).
 
-new_keepalive_interval(ChId, Interval) ->
-    gen_server:cast({via, emqx_lwm2m_registry, ChId}, {new_keepalive_interval, Interval}).
+send_ul_data(_ChId, _EventType, <<>>) -> ok;
+send_ul_data(ChId, EventType, Payload) ->
+    gen_server:cast({via, emqx_lwm2m_registry, ChId}, {send_ul_data, EventType, Payload}).
 
 %%--------------------------------------------------------------------
 %% gen_server Callbacks
 %%--------------------------------------------------------------------
 
-init({CoapPid, ClientId, ChId, KeepAliveInterval}) ->
-    ?LOG(debug, "try to start adapter ClientId=~p, ChId=~p", [ClientId, ChId]),
-    case ?PROTO_INIT(ClientId, undefined, undefined, ChId, KeepAliveInterval) of
-        {ok, Proto}           ->
-            Topic = <<"lwm2m/", ClientId/binary, "/command">>,
-            NewProto = ?PROTO_SUBSCRIBE(Topic, Proto),
-            RspTopic = <<"lwm2m/", ClientId/binary, "/response">>,
-            {ok, #state{coap_pid = CoapPid, proto = NewProto, peer = ChId, rsp_topic = RspTopic, sub_topic = Topic, keepalive_interval = KeepAliveInterval}};
-        Other                 ->
-            {stop, Other}
+init({CoapPid, ClientId, ChId, RegInfo = #{<<"lt">> := LifeTime}}) ->
+    LwM2MOpts = get_headers(RegInfo),
+    case proto_init(ClientId, undefined, undefined, ChId, LifeTime, LwM2MOpts) of
+        {ok, Proto} ->
+            ?LOG(debug, "start adapter ClientId=~p, ChId=~p, LwM2MOpts=~p", [ClientId, ChId, LwM2MOpts]),
+            self() ! post_init_process,
+            {ok, #state{
+                coap_pid = CoapPid,
+                proto = Proto,
+                peer = ChId,
+                reg_info = RegInfo,
+                life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired})
+            }};
+        {stop, Reason} -> {stop, Reason};
+        Reason -> {stop, Reason}
     end.
-
-handle_call({publish, Method, CoapResponse, DataFormat, Ref}, _From, State=#state{proto = Proto, rsp_topic = Topic}) ->
-    Message = emqx_lwm2m_cmd_handler:coap_response_to_mqtt_payload(Method, CoapResponse, DataFormat, Ref),
-    NewProto = ?PROTO_PUBLISH(Topic, Message, Proto),
-    {reply, ok, State#state{proto = NewProto}};
-
 
 handle_call(info, From, State = #state{proto = ProtoState, peer = Channel}) ->
     ProtoInfo  = emqx_protocol:info(ProtoState),
@@ -130,50 +119,79 @@ handle_call(Request, _From, State) ->
     ?LOG(error, "adapter unexpected call ~p", [Request]),
     {reply, ignored, State, hibernate}.
 
+handle_cast({send_ul_data, EventType, Payload}, State=#state{proto = Proto, coap_pid = CoapPid}) ->
+    NewProto = send_data(EventType, Payload, Proto),
+    flush_cached_downlink_messages(CoapPid),
+    {noreply, State#state{proto = NewProto}};
 
-handle_cast({new_keepalive_interval, Interval}, State=#state{}) ->
-    {noreply, State#state{keepalive_interval = Interval}, hibernate};
+handle_cast({update_reg_info, NewRegInfo}, State=#state{life_timer = LifeTimer, reg_info = RegInfo, proto = Proto, coap_pid = CoapPid}) ->
+    UpdatedRegInfo = maps:merge(RegInfo, NewRegInfo),
 
-handle_cast(keepalive, State=#state{keepalive_interval = undefined}) ->
-    {noreply, State, hibernate};
-handle_cast(keepalive, State=#state{keepalive = Keepalive}) ->
-    NewKeepalive = emqx_lwm2m_timer:kick_timer(Keepalive),
-    {noreply, State#state{keepalive = NewKeepalive}, hibernate};
+    %% - report the registration info update, but only when objectList is updated.
+    NewProto = case NewRegInfo of
+                   #{<<"objectList">> := _} ->
+                       UpdatePayload = append_device_id(#{<<"data">> => UpdatedRegInfo}, Proto),
+                       send_data(<<"update">>, UpdatePayload, Proto);
+                   _ -> Proto
+               end,
+
+    %% - flush cached donwlink commands
+    flush_cached_downlink_messages(CoapPid),
+
+    %% - update the life timer
+    UpdatedLifeTimer = emqx_lwm2m_timer:refresh_timer(maps:get(<<"lt">>, UpdatedRegInfo), LifeTimer),
+    {noreply, State#state{life_timer = UpdatedLifeTimer, reg_info = UpdatedRegInfo, proto = NewProto}, hibernate};
+
+handle_cast({replace_reg_info, NewRegInfo}, State=#state{life_timer = LifeTimer, proto = Proto, coap_pid = CoapPid}) ->
+    UpdatedLifeTimer = emqx_lwm2m_timer:refresh_timer(maps:get(<<"lt">>, NewRegInfo), LifeTimer),
+
+    UpdatePayload = append_device_id(#{<<"data">> => NewRegInfo}, Proto),
+    NewProto = send_data(<<"register">>, UpdatePayload, Proto),
+
+    flush_cached_downlink_messages(CoapPid),
+    {noreply, State#state{life_timer = UpdatedLifeTimer, reg_info = NewRegInfo, proto = NewProto}, hibernate};
 
 handle_cast(Msg, State) ->
     ?LOG(error, "unexpected cast ~p", [Msg]),
     {noreply, State, hibernate}.
 
 handle_info({deliver, Msg = #mqtt_message{topic = TopicName, payload = Payload}},
-             State = #state{proto = Proto, coap_pid = CoapPid}) ->
+             State = #state{proto = Proto, coap_pid = CoapPid, reg_info = RegInfo}) ->
     %% handle PUBLISH from broker
-    ?LOG(debug, "get message from broker Topic=~p, Payload=~p", [TopicName, Payload]),
-    NewProto = ?PROTO_DELIVER_ACK(Msg, Proto),
-    deliver_to_coap(Payload, CoapPid),
+    ?LOG(debug, "Get MQTT message from broker, Topic: ~p, Payload: ~p", [TopicName, Payload]),
+    #{<<"alternatePath">> := AlternatePath} = RegInfo,
+    deliver_to_coap(AlternatePath, Payload, CoapPid, Proto, is_cache_mode(RegInfo)),
+
+    NewProto = proto_deliver_ack(Msg, Proto),
     {noreply, State#state{proto = NewProto}};
 
 handle_info({suback, _MsgId, [_GrantedQos]}, State) ->
-    {noreply, State, hibernate};
-
-handle_info({subscribe,_}, State) ->
     {noreply, State};
 
-handle_info({keepalive, start, Interval}, StateData) ->
-    ?LOG(debug, "Keepalive at the interval of ~p", [Interval]),
-    KeepAlive = emqx_lwm2m_timer:start_timer(Interval, {keepalive, check}),
-    {noreply, StateData#state{keepalive = KeepAlive}, hibernate};
+handle_info(post_init_process, State = #state{proto = Proto, reg_info = RegInfo, coap_pid = CoapPid}) ->
+    %% - subscribe to the downlink_topic and wait for commands
+    {Topic, Qos} = downlink_topic(<<"register">>, Proto),
+    Proto1 = proto_subscribe(Topic, Qos, Proto),
 
-handle_info({keepalive, check}, StateData = #state{keepalive = KeepAlive, keepalive_interval = Interval}) ->
-    case emqx_lwm2m_timer:is_timeout(KeepAlive) of
-        false ->
-            ?LOG(debug, "Keepalive checked ok", []),
-            NewKeepAlive = emqx_lwm2m_timer:start_timer(Interval, {keepalive, check}),
-            {noreply, StateData#state{keepalive = NewKeepAlive}};
+    %% - report the registration info
+    RegPayload = append_device_id(#{<<"data">> => RegInfo}, Proto),
+    Proto2 = send_data(<<"register">>, RegPayload, Proto1),
+
+    %% - auto observe the objects, for demo only
+    case proplists:get_value(lwm2m_auto_observe, Proto#proto_state.headers, false) of
         true ->
-            ?LOG(debug, "Keepalive timeout", []),
-            {stop, keepalive_timeout, StateData}
-    end;
+            #{<<"alternatePath">> := AlternatePath} = RegInfo,
+            auto_observe(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto);
+        _ -> ok
+    end,
 
+    %% add the protocol type into proto_state.headers
+    Proto3 = append_lwm2m_proto_type(RegInfo, Proto2),
+    {noreply, State#state{proto = Proto3, sub_topic = Topic}};
+
+handle_info({life_timer, expired}, State) ->
+    ?LOG(debug, "LifeTime expired", []),
+    {stop, {shutdown, life_timer_timeout}, State};
 
 handle_info(emit_stats, State) ->
     ?LOG(info, "emit_stats is not supported", []),
@@ -193,63 +211,60 @@ handle_info(Info, State) ->
     ?LOG(error, "unexpected info ~p", [Info]),
     {noreply, State, hibernate}.
 
-terminate(Reason, #state{proto = Proto, keepalive = KeepAlive, sub_topic = SubTopic}) ->
-    emqx_lwm2m_timer:cancel_timer(KeepAlive),
-    CleanFun =  fun(Error) ->
-                    ?LOG(debug, "unsubscribe ~p while exiting", [SubTopic]),
-                    NewProto = ?PROTO_UNSUBSCRIBE(SubTopic, Proto),
-                    ?PROTO_SHUTDOWN(Error, NewProto)
-                end,
-    case {Proto, Reason} of
-        {undefined, _} ->
-            ok;
-        {_, {shutdown, Error}} ->
-            CleanFun(Error);
-        {_, Reason} ->
-            CleanFun(Reason)
-    end.
+terminate(Reason, #state{proto = Proto, life_timer = LifeTimer, sub_topic = SubTopic}) ->
+    ?LOG(debug, "process terminated: ~p", [Reason]),
+    is_reference(LifeTimer) andalso emqx_lwm2m_timer:cancel_timer(LifeTimer),
+    clean_subscribe(Reason, SubTopic, Proto).
 
+clean_subscribe(_Error, undefined, _Proto) -> ok;
+clean_subscribe(_Error, _SubTopic, undefined) -> ok;
+clean_subscribe({shutdown, Error}, SubTopic, Proto) ->
+    do_clean_subscribe(Error, SubTopic, Proto);
+clean_subscribe(Error, SubTopic, Proto) ->
+    do_clean_subscribe(Error, SubTopic, Proto).
+
+do_clean_subscribe(Error, SubTopic, Proto) ->
+    ?LOG(debug, "unsubscribe ~p while exiting", [SubTopic]),
+    NewProto = proto_unsubscribe(SubTopic, Proto),
+    emqx_protocol:shutdown(Error, NewProto).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
 
 %%--------------------------------------------------------------------
 %% Internal Functions
 %%--------------------------------------------------------------------
 
-proto_init(ClientId, Username, Password, Channel, KeepAliveInterval) ->
+proto_init(ClientId, Username, Password, Channel, LifeTime, LwM2MOpts) ->
     SendFun = fun(_Packet) -> ok end,
-    PktOpts = [{max_clientid_len, 96}, {max_packet_size, 512}],
+    PktOpts = [{max_clientid_len, 96}, {max_packet_size, 512}, {protocol, lwm2m}],
     Proto = emqx_protocol:init(Channel, SendFun, PktOpts),
+    NewProto = Proto#proto_state{headers = LwM2MOpts},
     ConnPkt = #mqtt_packet_connect{client_id  = ClientId,
                                    username   = Username,
                                    password   = Password,
                                    clean_sess = true,
-                                   keep_alive = KeepAliveInterval},
-    case emqx_protocol:received(?CONNECT_PACKET(ConnPkt), Proto) of
+                                   keep_alive = LifeTime},
+    case emqx_protocol:received(?CONNECT_PACKET(ConnPkt), NewProto) of
         {ok, Proto1}                              -> {ok, Proto1};
         {stop, {shutdown, auth_failure}, _Proto2} -> {stop, auth_failure};
-        Other                                     -> error(Other)
+        Other                                     -> Other
     end.
 
-proto_subscribe(Topic, Proto) ->
-    ?LOG(debug, "subscribe Topic=~p", [Topic]),
-    case emqx_protocol:received(?SUBSCRIBE_PACKET(1, [{Topic, ?QOS1}]), Proto) of
+proto_subscribe(Topic, Qos, Proto) ->
+    case emqx_protocol:received(?SUBSCRIBE_PACKET(1, [{Topic, Qos}]), Proto) of
         {ok, Proto1}  -> Proto1;
         Other         -> error(Other)
     end.
 
 proto_unsubscribe(Topic, Proto) ->
-    ?LOG(debug, "unsubscribe Topic=~p", [Topic]),
     case emqx_protocol:received(?UNSUBSCRIBE_PACKET(1, [Topic]), Proto) of
         {ok, Proto1}  -> Proto1;
         Other         -> error(Other)
     end.
 
-proto_publish(Topic, Payload, Proto) ->
-    ?LOG(debug, "publish Topic=~p, Payload=~p", [Topic, Payload]),
-    Publish = #mqtt_packet{header   = #mqtt_packet_header{type = ?PUBLISH, qos = ?QOS0},
+proto_publish(Topic, Payload, Qos, Proto) ->
+    Publish = #mqtt_packet{header   = #mqtt_packet_header{type = ?PUBLISH, qos = Qos},
                            variable = #mqtt_packet_publish{topic_name = Topic, packet_id = 1},
                            payload  = Payload},
     case emqx_protocol:received(Publish, Proto) of
@@ -275,17 +290,159 @@ proto_deliver_ack(#mqtt_message{qos = ?QOS2, pktid = PacketId}, Proto) ->
     end.
 
 
+deliver_to_coap(AlternatePath, JsonData, CoapPid, Proto, CacheMode) when is_binary(JsonData)->
+    try
+        TermData = jsx:decode(JsonData, [return_maps]),
+        deliver_to_coap(AlternatePath, TermData, CoapPid, Proto, CacheMode)
+    catch
+        ExClass:Error ->
+            ?LOG(error, "deliver_to_coap - Invalid JSON: ~p, Exception: ~p, stacktrace: ~p",
+                [JsonData, {ExClass, Error}, erlang:get_stacktrace()])
+    end;
 
-deliver_to_coap(JsonData, CoapPid) ->
-    ?LOG(debug, "deliver_to_coap CoapPid=~p (alive=~p), JsonData=~p", [CoapPid, is_process_alive(CoapPid), JsonData]),
-    case (catch jsx:decode(JsonData, [return_maps])) of
-        {'EXIT', _} ->
-            ?LOG(error, "downlink request has json format error, json=~p", [JsonData]),
-            ignore;
-        Command     ->
-            {CoapRequest, Ref} = emqx_lwm2m_cmd_handler:mqtt_payload_to_coap_request(Command),
-            CoapPid ! {dispatch_command, CoapRequest, Ref}
+deliver_to_coap(AlternatePath, TermData, CoapPid, Proto, CacheMode) when is_map(TermData) ->
+    ?LOG(info, "SEND To CoAP, AlternatePath=~p, Data=~p", [AlternatePath, TermData]),
+    Payload = append_device_id(TermData, Proto),
+    Lwm2mProtoType = proplists:get_value(<<"protocolType">>, Proto#proto_state.headers, 1),
+    {CoapRequest, Ref} = emqx_lwm2m_cmd_handler:mqtt_payload_to_coap_request(AlternatePath, Payload, Lwm2mProtoType),
+
+    case CacheMode of
+        false ->
+            do_deliver_to_coap(CoapPid, CoapRequest, Ref);
+        true ->
+            cache_downlink_message(CoapRequest, Ref)
     end.
 
+append_device_id(Report = #{}, #proto_state{client_id = ClientID, headers = Headers}) ->
+    IMEI = proplists:get_value(imei, Headers, ClientID),
+    IMSI = proplists:get_value(imsi, Headers, <<"undefined">>),
+    Report#{
+        <<"imei">> => IMEI,
+        <<"imsi">> => IMSI
+    }.
 
+append_lwm2m_proto_type(#{<<"ct">> := _IOTVer}, Proto) ->
+    Proto#proto_state{headers = [{<<"protocolType">>, 2} | Proto#proto_state.headers]};
+append_lwm2m_proto_type(_, Proto) ->
+    Proto#proto_state{headers = [{<<"protocolType">>, 1} | Proto#proto_state.headers]}.
 
+downlink_topic(EventType, #proto_state{client_id = ClientID, headers = Headers}) ->
+    proplists:get_value(downlink_topic_key(EventType), Headers, default_downlink_topic(EventType, ClientID)).
+
+uplink_topic(EventType, #proto_state{client_id = ClientID, headers = Headers}) ->
+    proplists:get_value(uplink_topic_key(EventType), Headers, default_uplink_topic(EventType, ClientID)).
+
+downlink_topic_key(Type)  when is_binary(Type) -> lwm2m_dn_dm_topic.
+
+uplink_topic_key(<<"notify">>) -> lwm2m_up_ad_topic;
+uplink_topic_key(<<"register">>) -> lwm2m_up_ol_topic;
+uplink_topic_key(<<"update">>) -> lwm2m_up_ol_topic;
+uplink_topic_key(Type) when is_binary(Type) -> lwm2m_up_dm_topic.
+
+default_downlink_topic(Type, ClientID) when is_binary(Type)->
+    {<<"lwm2m/", ClientID/binary, "/dn/#">>, 0}.
+
+default_uplink_topic(<<"notify">>, ClientID) ->
+    {<<"lwm2m/", ClientID/binary, "/up/ad">>, 0};
+default_uplink_topic(Type, ClientID) when is_binary(Type) ->
+    {<<"lwm2m/", ClientID/binary, "/up/dm">>, 0}.
+
+send_data(EventType, Payload = #{}, Proto)
+        when %% Send an extra "notify" for "observe" and "cancel-observe" responses
+            EventType =:= <<"observe">>;
+            EventType =:= <<"cancel-observe">>
+        ->
+    do_send_data(<<"notify">>, Payload, Proto),
+    do_send_data(EventType, Payload, Proto);
+send_data(EventType, Payload = #{}, Proto) ->
+    do_send_data(EventType, Payload, Proto).
+
+do_send_data(EventType, Payload, Proto) ->
+    NewPayload = maps:put(<<"msgType">>, EventType, Payload),
+    {Topic, Qos} = uplink_topic(EventType, Proto),
+    proto_publish(Topic, jsx:encode(NewPayload), Qos, Proto).
+
+auto_observe(AlternatePath, ObjectList, CoapPid, Proto) ->
+    erlang:spawn(fun() ->
+            observe_object_list(AlternatePath, ObjectList, CoapPid, Proto)
+        end).
+
+observe_object_list(AlternatePath, ObjectList, CoapPid, Proto) ->
+    lists:foreach(fun
+            (<<"/19", _/binary>>) ->
+                observe_object_slowly(AlternatePath, <<"/19/0/0">>, CoapPid, Proto, 100);
+            (ObjectPath) when is_binary(ObjectPath) ->
+                observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, 100)
+        end, ObjectList).
+
+observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, Interval) ->
+    observe_object(AlternatePath, ObjectPath, CoapPid, Proto),
+    timer:sleep(Interval).
+
+observe_object(AlternatePath, ObjectPath, CoapPid, Proto) ->
+    Payload = #{
+        <<"msgType">> => <<"observe">>,
+        <<"data">> => #{
+            <<"path">> => ObjectPath
+        }
+    },
+    ?LOG(info, "Observe ObjectPath: ~p", [ObjectPath]),
+    deliver_to_coap(AlternatePath, Payload, CoapPid, Proto, false).
+
+get_headers(RegInfo) ->
+    get_headers(RegInfo, []).
+
+get_headers(RegInfo = #{<<"apn">> := APN}, Headers) ->
+    get_headers(maps:remove(<<"apn">>, RegInfo), [{apn, APN} | Headers]);
+get_headers(RegInfo = #{<<"im">> := IM}, Headers) ->
+    get_headers(maps:remove(<<"im">>, RegInfo), [{im, IM} | Headers]);
+get_headers(RegInfo = #{<<"ct">> := CT}, Headers) ->
+    get_headers(maps:remove(<<"ct">>, RegInfo), [{ct, CT} | Headers]);
+get_headers(RegInfo = #{<<"mv">> := MV}, Headers) ->
+    get_headers(maps:remove(<<"mv">>, RegInfo), [{mv, MV} | Headers]);
+get_headers(RegInfo = #{<<"mt">> := MT}, Headers) ->
+    get_headers(maps:remove(<<"mt">>, RegInfo), [{mt, MT} | Headers]);
+get_headers(_, Headers) -> Headers.
+
+cache_downlink_message(CoapRequest, Ref) ->
+    ?LOG(debug, "Cache downlink coap request: ~p, Ref: ~p", [CoapRequest, Ref]),
+    put(dl_msg_cache, [{CoapRequest, Ref} | get_cached_downlink_messages()]).
+
+flush_cached_downlink_messages(CoapPid) ->
+    case erase(dl_msg_cache) of
+        CachedMessageList when is_list(CachedMessageList)->
+            do_deliver_to_coap_slowly(CoapPid, CachedMessageList, 100);
+        undefined -> ok
+    end.
+
+get_cached_downlink_messages() ->
+    case get(dl_msg_cache) of
+        undefined -> [];
+        CachedMessageList -> CachedMessageList
+    end.
+
+do_deliver_to_coap_slowly(CoapPid, CoapRequestList, Interval) ->
+    erlang:spawn(fun() ->
+        lists:foreach(fun({CoapRequest, Ref}) ->
+                do_deliver_to_coap(CoapPid, CoapRequest, Ref),
+                timer:sleep(Interval)
+            end, lists:reverse(CoapRequestList))
+        end).
+
+do_deliver_to_coap(CoapPid, CoapRequest, Ref) ->
+    ?LOG(debug, "Deliver To CoAP(~p), CoapRequest: ~p, Ref: ~p", [CoapPid, CoapRequest, Ref]),
+    CoapPid ! {dispatch_command, CoapRequest, Ref}.
+
+is_cache_mode(#{<<"apn">> := APN})
+    when
+        APN =:= <<"psmA.eDRX0.ctnb">>;
+        APN =:= <<"psmC.eDRX0.ctnb">>;
+        APN =:= <<"psmF.eDRXC.ctnb">>
+    -> true;
+is_cache_mode(#{<<"b">> := Binding})
+    when
+        Binding =:= <<"UQ">>;
+        Binding =:= <<"SQ">>;
+        Binding =:= <<"UQS">>
+    -> true;
+is_cache_mode(_) -> false.

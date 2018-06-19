@@ -20,32 +20,23 @@
 
 -include("emqx_lwm2m.hrl").
 
--export([cancel_timer/1, start_timer/2, kick_timer/1, is_timeout/1]).
+-export([cancel_timer/1, start_timer/2, refresh_timer/1, refresh_timer/2]).
 
--record(timer_state, {kickme, tref, message}).
+-record(timer_state, {interval, tref, message}).
 
 -define(LOG(Level, Format, Args),
     lager:Level("LWM2M-TIMER: " ++ Format, Args)).
 
-
-
 cancel_timer(#timer_state{tref = TRef}) when is_reference(TRef) ->
-    catch erlang:cancel_timer(TRef),
-    ok;
-cancel_timer(_) ->
-    ok.
+    erlang:cancel_timer(TRef), ok.
 
-kick_timer(State=#timer_state{kickme = false}) ->
-    State#timer_state{kickme = true};
-kick_timer(State=#timer_state{kickme = true}) ->
-    State.
+refresh_timer(State=#timer_state{interval = Interval, message = Msg}) ->
+    cancel_timer(State), start_timer(Interval, Msg).
+refresh_timer(NewInterval, State=#timer_state{message = Msg}) ->
+    cancel_timer(State), start_timer(NewInterval, Msg).
 
-start_timer(Sec, Msg) ->
-    ?LOG(debug, "emqx_lwm2m_timer:start_timer ~p", [Sec]),
-    TRef = erlang:send_after(timer:seconds(Sec), self(), Msg),
-    #timer_state{kickme = false, tref = TRef, message = Msg}.
-
-
-is_timeout(#timer_state{kickme = Bool}) ->
-    not Bool.
-
+%% start timer in seconds
+start_timer(Interval, Msg) ->
+    ?LOG(debug, "start_timer of ~p secs", [Interval]),
+    TRef = erlang:send_after(timer:seconds(Interval), self(), Msg),
+    #timer_state{interval = Interval, tref = TRef, message = Msg}.

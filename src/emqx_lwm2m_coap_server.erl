@@ -27,7 +27,7 @@
 
 
 start() ->
-    Port = application:get_env(?APP, port, 5783),
+    Port = application:get_env(?APP, port, 5683),
     start(Port).
 
 start(Port) ->
@@ -55,6 +55,3 @@ stop() ->
 
 
 % end of file
-
-
-

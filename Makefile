@@ -4,7 +4,7 @@ PROJECT_VERSION = 0.1
 
 DEPS = lager lwm2m_coap jsx clique
 dep_lager      = git https://github.com/basho/lager
-dep_lwm2m_coap = git https://github.com/grutabow/lwm2m-coap
+dep_lwm2m_coap = git https://github.com/emqx/lwm2m-coap dmp
 dep_jsx        = git https://github.com/talentdeficit/jsx
 dep_clique     = git https://github.com/emqtt/clique
 

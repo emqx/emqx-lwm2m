@@ -19,9 +19,10 @@
 
 -record(coap_mqtt_auth, {clientid, username, password}).
 
+-define(OMA_ALTER_PATH_RT, <<"\"oma.lwm2m\"">>).
 
 -define(MQ_COMMAND_ID,         <<"CmdID">>).
--define(MQ_COMMAND,            <<"Command">>).
+-define(MQ_COMMAND,            <<"requestID">>).
 -define(MQ_BASENAME,           <<"BaseName">>).
 -define(MQ_ARGS,               <<"Arguments">>).
 
@@ -44,6 +45,40 @@
 -define(LWM2M_FORMAT_TLV,        11542).
 -define(LWMWM_FORMAT_JSON,       11543).
 
+%-record(lwm2m_query, {epn, life_time, sms, lwm2m_ver, binding, object_list = []}).
+-record(lwm2m_context, {epn, location}).
 
+%% LwM2M Client Registration Interface
+-define(topic_register(Epn), <<"lwm2m/", Epn/binary, "/ul/reg/register">>).
+-define(topic_update(Epn), <<"lwm2m/", Epn/binary, "/ul/reg/update">>).
+-define(topic_deregister(Epn), <<"lwm2m/", Epn/binary, "/ul/reg/de_register">>).
 
+%% LwM2M Device Management & Service Enablement Interface
+-define(topic_read(Epn, ReqID), <<"lwm2m/", Epn/binary, "/dl/mgmt/read/", ReqID/binary>>).
+-define(topic_read_response(Epn, ReqID), <<"lwm2m/", Epn/binary, "/ul/mgmt/read/", ReqID/binary>>).
 
+-define(topic_discover(Epn, ReqID), <<"lwm2m/", Epn/binary, "/dl/mgmt/discover/", ReqID/binary>>).
+-define(topic_discover_response(Epn, ReqID), <<"lwm2m/", Epn/binary, "/ul/mgmt/discover/", ReqID/binary>>).
+
+-define(topic_write(Epn, ReqID), <<"lwm2m/", Epn/binary, "/dl/mgmt/write/", ReqID/binary>>).
+-define(topic_write_response(Epn, ReqID), <<"lwm2m/", Epn/binary, "/ul/mgmt/write/", ReqID/binary>>).
+
+-define(topic_writeattr(Epn, ReqID), <<"lwm2m/", Epn/binary, "/dl/mgmt/write_attr/", ReqID/binary>>).
+-define(topic_writeattr_response(Epn, ReqID), <<"lwm2m/", Epn/binary, "/ul/mgmt/write_attr/", ReqID/binary>>).
+
+-define(topic_execute(Epn, ReqID), <<"lwm2m/", Epn/binary, "/dl/mgmt/execute/", ReqID/binary>>).
+-define(topic_execute_response(Epn, ReqID), <<"lwm2m/", Epn/binary, "/ul/mgmt/execute/", ReqID/binary>>).
+
+-define(topic_create(Epn, ReqID), <<"lwm2m/", Epn/binary, "/dl/mgmt/create/", ReqID/binary>>).
+-define(topic_create_response(Epn, ReqID), <<"lwm2m/", Epn/binary, "/ul/mgmt/create/", ReqID/binary>>).
+
+-define(topic_delete(Epn, ReqID), <<"lwm2m/", Epn/binary, "/dl/mgmt/delete/", ReqID/binary>>).
+-define(topic_delete_response(Epn, ReqID), <<"lwm2m/", Epn/binary, "/ul/mgmt/delete/", ReqID/binary>>).
+
+-define(topic_ack(Epn, ReqID), <<"lwm2m/", Epn/binary, "/ul/mgmt/ack/", ReqID/binary>>).
+
+%% Information Reporting Interface
+-define(topic_observe(Epn, ReqID), <<"lwm2m/", Epn/binary, "/dl/report/observe/", ReqID/binary>>).
+-define(topic_cancelobserve(Epn, ReqID), <<"lwm2m/", Epn/binary, "/dl/report/cancel_observe/", ReqID/binary>>).
+
+-define(topic_notify(Epn, ReqID), <<"lwm2m/", Epn/binary, "/ul/report/notify/", ReqID/binary>>).

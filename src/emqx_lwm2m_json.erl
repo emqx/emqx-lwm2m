@@ -18,19 +18,17 @@
 
 -author("Feng Lee <feng@emqtt.io>").
 
--export([tlv_to_json/2, json_to_tlv/1, text_to_json/2, opaque_to_json/2]).
+-export([tlv_to_json/2, json_to_tlv/2, text_to_json/2, opaque_to_json/2]).
 
 -include("emqx_lwm2m.hrl").
 
 -define(LOG(Level, Format, Args), lager:Level("LWM2M-JSON: " ++ Format, Args)).
 
-
-
-
 tlv_to_json(BaseName, TlvData) ->
+    DecodedTlv = emqx_lwm2m_tlv:parse(TlvData),
     ObjectId = object_id(BaseName),
     ObjDefinition = emqx_lwm2m_xml_object:get_obj_def(ObjectId, true),
-    case TlvData of
+    case DecodedTlv of
         [#{tlv_resource_with_value:=Id, value:=Value}] ->
             TrueBaseName = basename(BaseName, undefined, undefined, Id, 3),
             encode_json(TrueBaseName, tlv_single_resource(Id, Value, ObjDefinition));
@@ -43,7 +41,7 @@ tlv_to_json(BaseName, TlvData) ->
         [#{tlv_object_instance:=Id, value:=Value}] ->
             TrueBaseName = basename(BaseName, undefined, Id, undefined, 2),
             encode_json(TrueBaseName, tlv_level2(<<>>, Value, ObjDefinition, []));
-        List3=[#{tlv_object_instance:=Id, value:=Value}, _|_] ->
+        List3=[#{tlv_object_instance:=Id, value:=_Value}, _|_] ->
             TrueBaseName = basename(BaseName, Id, undefined, undefined, 1),
             encode_json(TrueBaseName, tlv_level1(List3, ObjDefinition, []))
     end.
@@ -79,34 +77,26 @@ tlv_single_resource(Id, Value, ObjDefinition) ->
     {K, V} = value(Value, Id, ObjDefinition),
     [#{K=>V}].
 
-
-
 basename(OldBaseName, ObjectId, ObjectInstanceId, ResourceId, 3) ->
     ?LOG(debug, "basename3 OldBaseName=~p, ObjectId=~p, ObjectInstanceId=~p, ResourceId=~p", [OldBaseName, ObjectId, ObjectInstanceId, ResourceId]),
-    case binary:split(OldBaseName, [<<$/>>], [global]) of
-        [<<>>, ObjId, ObjInsId, ResId, <<>>] -> <<$/, ObjId/binary, $/, ObjInsId/binary, $/, ResId/binary>>;
-        [<<>>, ObjId, ObjInsId, <<>>]        -> <<$/, ObjId/binary, $/, ObjInsId/binary, $/, (integer_to_binary(ResourceId))/binary>>;
-        [<<>>, ObjId, ObjInsId, ResId]       -> <<$/, ObjId/binary, $/, ObjInsId/binary, $/, ResId/binary>>;
-        [<<>>, ObjId, <<>>]                  -> <<$/, ObjId/binary, $/, (integer_to_binary(ObjectInstanceId))/binary, $/, (integer_to_binary(ResourceId))/binary>>;
-        [<<>>, ObjId, ObjInsId]              -> <<$/, ObjId/binary, $/, ObjInsId/binary, $/, (integer_to_binary(ResourceId))/binary>>;
-        [<<>>, ObjId]                        -> <<$/, ObjId/binary, $/, (integer_to_binary(ObjectInstanceId))/binary, $/, (integer_to_binary(ResourceId))/binary>>
+    case binary:split(binary_util:trim(OldBaseName, $/), [<<$/>>], [global]) of
+        [ObjId, ObjInsId, ResId] -> <<$/, ObjId/binary, $/, ObjInsId/binary, $/, ResId/binary>>;
+        [ObjId, ObjInsId] -> <<$/, ObjId/binary, $/, ObjInsId/binary, $/, (integer_to_binary(ResourceId))/binary>>;
+        [ObjId] -> <<$/, ObjId/binary, $/, (integer_to_binary(ObjectInstanceId))/binary, $/, (integer_to_binary(ResourceId))/binary>>
     end;
 basename(OldBaseName, ObjectId, ObjectInstanceId, ResourceId, 2) ->
     ?LOG(debug, "basename2 OldBaseName=~p, ObjectId=~p, ObjectInstanceId=~p, ResourceId=~p", [OldBaseName, ObjectId, ObjectInstanceId, ResourceId]),
-    case binary:split(OldBaseName, [<<$/>>], [global]) of
-        [<<>>, ObjId, ObjInsId, _ResId, <<>>] -> <<$/, ObjId/binary, $/, ObjInsId/binary>>;
-        [<<>>, ObjId, ObjInsId, _ResId]       -> <<$/, ObjId/binary, $/, ObjInsId/binary>>;
-        [<<>>, ObjId, <<>>]                   -> <<$/, ObjId/binary, $/, (integer_to_binary(ObjectInstanceId))/binary>>;
-        [<<>>, ObjId, ObjInsId]               -> <<$/, ObjId/binary, $/, ObjInsId/binary>>;
-        [<<>>, ObjId]                         -> <<$/, ObjId/binary, $/, (integer_to_binary(ObjectInstanceId))/binary>>
+    case binary:split(binary_util:trim(OldBaseName, $/), [<<$/>>], [global]) of
+        [ObjId, ObjInsId, _ResId] -> <<$/, ObjId/binary, $/, ObjInsId/binary>>;
+        [ObjId, ObjInsId] -> <<$/, ObjId/binary, $/, ObjInsId/binary>>;
+        [ObjId] -> <<$/, ObjId/binary, $/, (integer_to_binary(ObjectInstanceId))/binary>>
     end;
 basename(OldBaseName, ObjectId, ObjectInstanceId, ResourceId, 1) ->
     ?LOG(debug, "basename1 OldBaseName=~p, ObjectId=~p, ObjectInstanceId=~p, ResourceId=~p", [OldBaseName, ObjectId, ObjectInstanceId, ResourceId]),
-    case binary:split(OldBaseName, [<<$/>>], [global]) of
-        [<<>>, ObjId, _ObjInsId, _ResId, <<>>] -> <<$/, ObjId/binary>>;
-        [<<>>, ObjId, _ObjInsId, _ResId]       -> <<$/, ObjId/binary>>;
-        [<<>>, ObjId, _ObjInsId]               -> <<$/, ObjId/binary>>;
-        [<<>>, ObjId]                          -> <<$/, ObjId/binary>>
+    case binary:split(binary_util:trim(OldBaseName, $/), [<<$/>>], [global]) of
+        [ObjId, _ObjInsId, _ResId]       -> <<$/, ObjId/binary>>;
+        [ObjId, _ObjInsId]               -> <<$/, ObjId/binary>>;
+        [ObjId]                          -> <<$/, ObjId/binary>>
     end.
 
 
@@ -118,10 +108,11 @@ name(RelativePath, Id) ->
 
 
 object_id(BaseName) ->
-    case binary:split(BaseName, [<<$/>>], [global]) of
-        [<<>>, ObjIdBin1]       -> binary_to_integer(ObjIdBin1);
-        [<<>>, ObjIdBin2, _]    -> binary_to_integer(ObjIdBin2);
-        [<<>>, ObjIdBin3, _, _] -> binary_to_integer(ObjIdBin3)
+    case binary:split(binary_util:trim(BaseName, $/), [<<$/>>], [global]) of
+        [ObjId]       -> binary_to_integer(ObjId);
+        [ObjId, _]    -> binary_to_integer(ObjId);
+        [ObjId, _, _] -> binary_to_integer(ObjId);
+        [ObjId, _, _, _] -> binary_to_integer(ObjId)
     end.
 
 object_resource_id(BaseName) ->
@@ -141,7 +132,7 @@ value(Value, ResourceId, ObjDefinition) ->
             <<IntResult:Size>> = Value,
             {v, IntResult};
         "Float" ->
-            Size = byte_size(Value),
+            Size = byte_size(Value)*8,
             <<FloatResult:Size/float>> = Value,
             {v, FloatResult};
         "Boolean" ->
@@ -166,28 +157,20 @@ encode_json(BaseName, E) ->
     ?LOG(debug, "encode_json BaseName=~p, E=~p", [BaseName, E]),
     #{bn=>BaseName, e=>E}.
 
-json_to_tlv(Json=#{}) ->
-    {BaseName, E} = bn_e(Json),
-    case split_path(BaseName) of
-        [_ObjectId, _ObjectInstanceId, ResourceId] ->
-            case length(E) of
-                1 -> element_single_resource(ResourceId, E);
-                _ -> element_loop_level4(E, [#{tlv_multiple_resource=>ResourceId, value=>[]}])
-            end;
-        [_ObjectId, _ObjectInstanceId] ->
-            element_loop_level3(E, []);
-        [_ObjectId] ->
-            element_loop_level2(E, [])
+json_to_tlv([_ObjectId, _ObjectInstanceId, ResourceId], ResourceArray) ->
+    case length(ResourceArray) of
+        1 -> element_single_resource(integer(ResourceId), ResourceArray);
+        _ -> element_loop_level4(ResourceArray, [#{tlv_multiple_resource=>integer(ResourceId), value=>[]}])
     end;
-json_to_tlv(JsonBinary) ->
-    Json = jsx:decode(JsonBinary, [return_maps]),
-    json_to_tlv(Json).
-
+json_to_tlv([_ObjectId, _ObjectInstanceId], ResourceArray) ->
+    element_loop_level3(ResourceArray, []);
+json_to_tlv([_ObjectId], ResourceArray) ->
+    element_loop_level2(ResourceArray, []).
 
 element_single_resource(ResourceId, [H=#{}]) ->
     [{Key, Value}] = maps:to_list(H),
     BinaryValue = value_ex(Key, Value),
-    [#{tlv_resource_with_value=>ResourceId, value=>BinaryValue}].
+    [#{tlv_resource_with_value=>integer(ResourceId), value=>BinaryValue}].
 
 element_loop_level2([], Acc) ->
     Acc;
@@ -244,7 +227,7 @@ insert_resource_into_object([ObjectInstanceId|OtherIds], Value, Acc) ->
     case find_obj_instance(ObjectInstanceId, Acc) of
         undefined ->
             NewList = insert_resource_into_object_instance(OtherIds, Value, []),
-            Acc ++ [#{tlv_object_instance=>ObjectInstanceId, value=>NewList}];
+            Acc ++ [#{tlv_object_instance=>integer(ObjectInstanceId), value=>NewList}];
         ObjectInstance = #{value:=List} ->
             NewList = insert_resource_into_object_instance(OtherIds, Value, List),
             Acc2 = lists:delete(ObjectInstance, Acc),
@@ -256,7 +239,7 @@ insert_resource_into_object_instance([ResourceId, ResourceInstanceId], Value, Ac
     case find_resource(ResourceId, Acc) of
         undefined ->
             NewList = insert_resource_instance_into_resource(ResourceInstanceId, Value, []),
-            Acc++[#{tlv_multiple_resource=>ResourceId, value=>NewList}];
+            Acc++[#{tlv_multiple_resource=>integer(ResourceId), value=>NewList}];
         Resource = #{value:=List}->
             NewList = insert_resource_instance_into_resource(ResourceInstanceId, Value, List),
             Acc2 = lists:delete(Resource, Acc),
@@ -264,7 +247,7 @@ insert_resource_into_object_instance([ResourceId, ResourceInstanceId], Value, Ac
     end;
 insert_resource_into_object_instance([ResourceId], Value, Acc) ->
     ?LOG(debug, "insert_resource_into_object_instance2() ResourceId=~p, Value=~p, Acc=~p", [ResourceId, Value, Acc]),
-    NewMap = #{tlv_resource_with_value=>ResourceId, value=>Value},
+    NewMap = #{tlv_resource_with_value=>integer(ResourceId), value=>Value},
     case find_resource(ResourceId, Acc) of
         undeinfed ->
             Acc ++ [NewMap];
@@ -275,7 +258,7 @@ insert_resource_into_object_instance([ResourceId], Value, Acc) ->
 
 insert_resource_instance_into_resource(ResourceInstanceId, Value, Acc) ->
     ?LOG(debug, "insert_resource_instance_into_resource() ResourceInstanceId=~p, Value=~p, Acc=~p", [ResourceInstanceId, Value, Acc]),
-    NewMap = #{tlv_resource_instance=>ResourceInstanceId, value=>Value},
+    NewMap = #{tlv_resource_instance=>integer(ResourceInstanceId), value=>Value},
     case find_resource_instance(ResourceInstanceId, Acc) of
         undeinfed ->
             Acc ++ [NewMap];
@@ -326,14 +309,7 @@ encode_number(Value) ->
         false -> <<Value:64/float>>
     end.
 
-encode_int(Int) ->
-    if
-        Int >= 65536 -> <<Int:24>>;
-        Int >= 256   -> <<Int:16>>;
-        true         -> <<Int:8>>
-    end.
-
-
+encode_int(Int) -> binary:encode_unsigned(Int).
 
 text_to_json(BaseName, Text) ->
     {ObjectId, ResourceId} = object_resource_id(BaseName),
@@ -369,9 +345,5 @@ text_value(Text, ResourceId, ObjDefinition) ->
 opaque_to_json(BaseName, Binary) ->
     #{bn=>BaseName, e=>[#{sv=>base64:encode(Binary)}]}.
 
-bn_e(#{bn:=BaseName, e:=E}) ->
-    {BaseName, E};
-bn_e(#{<<"bn">>:=BaseName, <<"e">>:=E}) ->
-    {BaseName, E}.
-
-
+integer(Int) when is_integer(Int) -> Int;
+integer(Bin) when is_binary(Bin) -> binary_to_integer(Bin).

@@ -28,87 +28,76 @@
 
 -behaviour(lwm2m_coap_resource).
 
--export([coap_discover/2, coap_get/4, coap_post/5, coap_put/5, coap_delete/3,
+-export([coap_discover/2, coap_get/4, coap_post/4, coap_put/4, coap_delete/3,
     coap_observe/4, coap_unobserve/1, handle_info/2, coap_ack/2]).
+
+-export([parse_object_list/1]).
 
 -include("emqx_lwm2m.hrl").
 
--define(LWM2M_REGISTER_PREFIX, <<"rd">>).
+-define(PREFIX, <<"rd">>).
 
 -define(LOG(Level, Format, Args),
     lager:Level("LWM2M-RESOURCE: " ++ Format, Args)).
-
--record(lwm2m_query, {epn, life_time, sms, lwm2m_ver}).
-
--record(lwm2m_context, {epn, location}).
-
 
 % resource operations
 coap_discover(_Prefix, _Args) ->
     [{absolute, "mqtt", []}].
 
-coap_get(ChId, [?LWM2M_REGISTER_PREFIX], Name, Query) ->
-    ?LOG(debug, "~p ~p GET Name=~p, Query=~p~n", [self(),ChId, Name, Query]),
+coap_get(ChId, [?PREFIX], Query, Content) ->
+    ?LOG(debug, "~p ~p GET Query=~p, Content=~p", [self(),ChId, Query, Content]),
     #coap_content{};
-coap_get(ChId, Prefix, Name, Query) ->
-    ?LOG(error, "ignore bad put request ChId=~p, Prefix=~p, Name=~p, Query=~p", [ChId, Prefix, Name, Query]),
+coap_get(ChId, Prefix, Query, Content) ->
+    ?LOG(error, "ignore bad put request ChId=~p, Prefix=~p, Query=~p, Content=~p", [ChId, Prefix,  Query, Content]),
     {error, bad_request}.
 
 % LWM2M REGISTER COMMAND
-coap_post(ChId, [?LWM2M_REGISTER_PREFIX], [], Query, Content) ->
-    #lwm2m_query{epn = Epn, lwm2m_ver = Ver, life_time = LifeTime} = parse_query(Query),
-    case (check_epn(Epn) andalso check_lifetime(LifeTime) andalso check_lwm2m_version(Ver)) of
-        true ->
-            Location = list_to_binary(io_lib:format("~.16B", [random:uniform(65535)])),
-            ?LOG(debug, "~p ~p REGISTER command Query=~p, Content=~p, Location=~p", [self(), ChId, Query, Content, Location]),
-            put(lwm2m_context, #lwm2m_context{epn = Epn, location = Location}),
-            % TODO: parse content
-            emqx_lwm2m_mqtt_adapter:start_link(self(), Epn, ChId, LifeTime),
-            {ok, created, #coap_content{payload = list_to_binary(io_lib:format("/rd/~s", [Location]))}};
-        false ->
-            ?LOG(error, "refuse REGISTER from ~p due to wrong parameters, epn=~p, lifetime=~p, lwm2m_ver=~p", [ChId, Epn, LifeTime, Ver]),
-            quit(ChId),
-            {error, not_acceptable}
+coap_post(ChId, [?PREFIX], Query, Content = #coap_content{uri_path = [?PREFIX]}) ->
+    ?LOG(debug, "~p ~p REGISTER command Query=~p, Content=~p", [self(), ChId, Query, Content]),
+    case parse_options(Query) of
+        {error, {bad_opt, _CustomOption}} ->
+            ?LOG(error, "Reject REGISTER from ~p due to wrong option", [ChId]),
+            {error, bad_request};
+        {ok, LwM2MQuery} ->
+            process_register(ChId, LwM2MQuery, Content#coap_content.payload)
     end;
-
 
 % LWM2M UPDATE COMMAND
-coap_post(ChId, [?LWM2M_REGISTER_PREFIX], [Location], Query, Content) ->
-    #lwm2m_query{life_time = LifeTime} = parse_query(Query),
-    #lwm2m_context{location = TrueLocation} = get(lwm2m_context),
-    ?LOG(debug, "~p ~p UPDATE command location=~p, LifeTime=~p, Query=~p, Content=~p", [self(), ChId, Location, LifeTime, Query, Content]),
-    % TODO: parse content
-    case Location of
-        TrueLocation ->
-            emqx_lwm2m_mqtt_adapter:new_keepalive_interval(ChId, LifeTime),
-            {ok, changed, #coap_content{}};
-        _Other       ->
-            ?LOG(error, "Location mismatch ~p vs ~p", [Location, TrueLocation]),
-            {error, bad_request}
+coap_post(ChId, [?PREFIX], Query, Content = #coap_content{uri_path = LocationPath}) ->
+    ?LOG(debug, "~p ~p UPDATE command location=~p, Query=~p, Content=~p", [self(), ChId, LocationPath, Query, Content]),
+    case parse_options(Query) of
+        {error, {bad_opt, _CustomOption}} ->
+            ?LOG(error, "Reject UPDATE from ~p due to wrong option, Query=~p", [ChId, Query]),
+            {error, bad_request};
+        {ok, LwM2MQuery} ->
+            process_update(ChId, LwM2MQuery, LocationPath, Content#coap_content.payload)
     end;
-coap_post(ChId, Prefix, Name, Query, Content) ->
-    ?LOG(error, "bad post request ChId=~p, Prefix=~p, Name=~p, Query=~p, Content=~p", [ChId, Prefix, Name, Query, Content]),
+
+coap_post(ChId, Prefix, Query, Content) ->
+    ?LOG(error, "bad post request ChId=~p, Prefix=~p, Query=~p, Content=~p", [ChId, Prefix, Query, Content]),
     {error, bad_request}.
 
-coap_put(_ChId, Prefix, Name, Query, Content) ->
-    ?LOG(error, "put has error, Prefix=~p, Name=~p, Query=~p, Content=~p", [Prefix, Name, Query, Content]),
+coap_put(_ChId, Prefix, Query, Content) ->
+    ?LOG(error, "put has error, Prefix=~p, Query=~p, Content=~p", [Prefix, Query, Content]),
     {error, bad_request}.
 
 % LWM2M DE-REGISTER COMMAND
-coap_delete(ChId, [?LWM2M_REGISTER_PREFIX], [Location]) ->
-    #lwm2m_context{location = TrueLocation} = get(lwm2m_context),
-    ?LOG(debug, "~p ~p DELETE command location=~p", [self(), ChId, Location]),
-    case Location of
-        TrueLocation ->
+coap_delete(ChId, [?PREFIX], #coap_content{uri_path = Location}) ->
+    LocationPath = binary_util:join_path(Location),
+    ?LOG(debug, "~p ~p DELETE command location=~p", [self(), ChId, LocationPath]),
+    case get(lwm2m_context) of
+        #lwm2m_context{location = LocationPath} ->
             emqx_lwm2m_mqtt_adapter:stop(ChId),
-            quit(ChId);
-        _Other ->
-            ?LOG(error, "ignore DE-REGISTER command due to mismatch location ~p vs ~p", [Location, TrueLocation]),
-            ignore
-    end,
-    ok;
-coap_delete(_ChId, _Prefix, _Name) ->
-    {error, bad_request}.
+            quit(ChId), ok;
+        undefined ->
+            ?LOG(error, "Location: ~p not found", [Location]),
+            {error, forbidden};
+        TrueLocation ->
+            ?LOG(error, "Wrong Location: ~p, registered location record: ~p", [Location, TrueLocation]),
+            {error, not_found}
+    end;
+coap_delete(_ChId, _Prefix, _Content) ->
+    {error, forbidden}.
 
 
 coap_observe(ChId, Prefix, Name, Ack) ->
@@ -120,51 +109,171 @@ coap_unobserve({state, ChId, Prefix, Name}) ->
     ok.
 
 handle_info({dispatch_command, CoapRequest, Ref}, _ObState) ->
-    ?LOG(debug, "dispatch_command CoapRequest=~p, Ref=~p", [CoapRequest, Ref]),
     {send_request, CoapRequest, Ref};
 
-handle_info({coap_response, ChId, _Channel, Ref, Msg=#coap_message{method = Method, payload = Payload, options = Options}}, ObState) ->
-    ?LOG(debug, "receive coap response from device ~p", [Msg]),
-    DataFormat = data_format(Options),
-    emqx_lwm2m_mqtt_adapter:publish(ChId, Method, Payload, DataFormat, Ref),
+handle_info({coap_response, ChId, _Channel, Ref, Msg=#coap_message{method = Method,
+        payload = CoapResponse, options = Options}}, ObState) ->
+    ?LOG(info, "Received CoAP response from device: ~p, ref: ~p", [Msg, Ref]),
+    MqttPayload = emqx_lwm2m_cmd_handler:coap_response_to_mqtt_payload(Method, CoapResponse, Options, Ref),
+    emqx_lwm2m_mqtt_adapter:send_ul_data(ChId, maps:get(<<"msgType">>, MqttPayload), MqttPayload),
     {noreply, ObState};
 
 handle_info(Message, State) ->
     ?LOG(error, "Unknown Message ~p", [Message]),
     {noreply, State}.
 
-coap_ack(_Ref, State) -> {ok, State}.
+coap_ack(Ref, State) ->
+    ?LOG(error, "Empty ACK: ~p", [Ref]),
+    {ok, State}.
 
+%%%%%%%%%%%%%%%%%%%%%%
+%% Internal Functions
+%%%%%%%%%%%%%%%%%%%%%%
+process_register(ChId, LwM2MQuery, LwM2MPayload) ->
+    Epn = maps:get(<<"ep">>, LwM2MQuery, undefined),
+    LifeTime = maps:get(<<"lt">>, LwM2MQuery, undefined),
+    Ver = maps:get(<<"lwm2m">>, LwM2MQuery, undefined),
+    case check_lwm2m_version(Ver) of
+        false ->
+            ?LOG(error, "Reject REGISTER from ~p due to unsupported version: ~p", [ChId, Ver]),
+            quit(ChId), {error, precondition_failed};
+        true ->
+            case check_epn(Epn) andalso check_lifetime(LifeTime) of
+                true ->
+                    start_lwm2m_emq_client(ChId, LwM2MQuery, LwM2MPayload);
+                false ->
+                    ?LOG(error, "Reject REGISTER from ~p due to wrong parameters, epn=~p, lifetime=~p", [ChId, Epn, LifeTime]),
+                    quit(ChId),
+                    {error, bad_request}
+            end
+    end.
 
-parse_query(InputQuery) ->
-    parse_query(InputQuery, #lwm2m_query{}).
+process_update(ChId, LwM2MQuery, Location, LwM2MPayload) ->
+    LocationPath = binary_util:join_path(Location),
+    case get(lwm2m_context) of
+        #lwm2m_context{location = LocationPath} ->
+            RegInfo = append_object_list(LwM2MQuery, LwM2MPayload),
+            emqx_lwm2m_mqtt_adapter:update_reg_info(ChId, RegInfo),
+            {ok, changed, #coap_content{}};
+        undefined ->
+            ?LOG(error, "Location: ~p not found", [Location]),
+            {error, forbidden};
+        TrueLocation ->
+            ?LOG(error, "Wrong Location: ~p, registered location record: ~p", [Location, TrueLocation]),
+            {error, not_found}
+    end.
 
-parse_query([], Query=#lwm2m_query{}) ->
-    Query;
-parse_query(["lt="++Rest|T], Query=#lwm2m_query{}) ->
-    parse_query(T, Query#lwm2m_query{life_time = list_to_integer(Rest)});
-parse_query(["lwm2m="++Rest|T], Query=#lwm2m_query{}) ->
-    parse_query(T, Query#lwm2m_query{lwm2m_ver = list_to_binary(Rest)});
-parse_query(["ep="++Rest|T], Query=#lwm2m_query{}) ->
-    parse_query(T, Query#lwm2m_query{epn = list_to_binary(Rest)});
-parse_query([<<$e, $p, $=, Rest/binary>>|T], Query=#lwm2m_query{}) ->
-    parse_query(T, Query#lwm2m_query{epn = Rest});
-parse_query([<<$l, $t, $=, Rest/binary>>|T], Query=#lwm2m_query{}) ->
-    parse_query(T, Query#lwm2m_query{life_time = binary_to_integer(Rest)});
-parse_query([<<$l, $w, $m, $2, $m, $=, Rest/binary>>|T], Query=#lwm2m_query{}) ->
-    parse_query(T, Query#lwm2m_query{lwm2m_ver = Rest});
-parse_query([Unknown|T], Query) ->
-    ?LOG(debug, "parse_query ignore unknown query ~p", [Unknown]),
-    parse_query(T, Query).
+start_lwm2m_emq_client(ChId, LwM2MQuery = #{<<"ep">> := Epn}, LwM2MPayload) ->
+    RegInfo = append_object_list(LwM2MQuery, LwM2MPayload),
+    process_flag(trap_exit, true),
+    case emqx_lwm2m_mqtt_adapter:start_link(self(), Epn, ChId, RegInfo) of
+        {ok, LwClientPid} ->
+            LocationPath = assign_location_path(Epn),
+            ?LOG(info, "REGISTER Success, LwClientPid: ~p, assgined location: ~p", [LwClientPid, LocationPath]),
+            {ok, created, #coap_content{location_path = LocationPath}};
+        {error, {already_started, _LwClientPid}} ->
+            case get(lwm2m_context) of
+                #lwm2m_context{epn = Epn, location = LocationPath} ->
+                    ?LOG(info, "RE-REGISTER Success, location: ~p", [LocationPath]),
+                    emqx_lwm2m_mqtt_adapter:replace_reg_info(ChId, RegInfo),
+                    {ok, created, #coap_content{location_path = location_path_list(LocationPath)}};
+                TrueLocation ->
+                    ?LOG(error, "Wrong EPN: ~p, registered location record: ~p", [Epn, TrueLocation]),
+                    {error, forbidden}
+            end;
+        {error, Error} ->
+            ?LOG(error, "REGISTER Failed, error: ~p", [Error]),
+            {error, forbidden}
+    end.
 
-data_format([]) ->
-    <<"text/plain">>;
-data_format([{content_format, Format}|_]) ->
-    Format;
-data_format([{_, _}|T]) ->
-    data_format(T).
+location_path_list(Location) ->
+    binary:split(binary_util:trim(Location, $/), <<$/>>, [global]).
 
+append_object_list(LwM2MQuery, <<>>) when map_size(LwM2MQuery) == 0 -> #{};
+append_object_list(LwM2MQuery, <<>>) -> LwM2MQuery;
+append_object_list(LwM2MQuery, LwM2MPayload) when is_binary(LwM2MPayload) ->
+    {AlterPath, ObjList} = parse_object_list(LwM2MPayload),
+    LwM2MQuery#{
+        <<"alternatePath">> => AlterPath,
+        <<"objectList">> => ObjList
+    }.
 
+parse_options(InputQuery) ->
+    parse_options(InputQuery, maps:new()).
+
+parse_options([], Query) -> {ok, Query};
+parse_options([<<"ep=", Epn/binary>>|T], Query) ->
+    parse_options(T, maps:put(<<"ep">>, Epn, Query));
+parse_options([<<"lt=", Lt/binary>>|T], Query) ->
+    parse_options(T, maps:put(<<"lt">>, binary_to_integer(Lt), Query));
+parse_options([<<"lwm2m=", Ver/binary>>|T], Query) ->
+    parse_options(T, maps:put(<<"lwm2m">>, Ver, Query));
+parse_options([<<"b=", Binding/binary>>|T], Query) ->
+    parse_options(T, maps:put(<<"b">>, Binding, Query));
+parse_options([CustomOption|T], Query) ->
+    case binary:split(CustomOption, <<"=">>) of
+        [OptKey, OptValue] when OptKey =/= <<>> ->
+            ?LOG(debug, "non-standard option: ~p", [CustomOption]),
+            parse_options(T, maps:put(OptKey, OptValue, Query));
+        _BadOpt ->
+            ?LOG(error, "bad option: ~p", [CustomOption]),
+            {error, {bad_opt, CustomOption}}
+    end.
+
+parse_object_list(<<>>) -> {<<"/">>, <<>>};
+parse_object_list(ObjLinks) when is_binary(ObjLinks) ->
+    parse_object_list(binary:split(ObjLinks, <<",">>, [global]));
+
+parse_object_list(FullObjLinkList) when is_list(FullObjLinkList) ->
+    case drop_attr(FullObjLinkList) of
+        {<<"/">>, _} = RootPrefixedLinks ->
+            RootPrefixedLinks;
+        {AlterPath, ObjLinkList} ->
+            LenAlterPath = byte_size(AlterPath),
+            WithOutPrefix =
+                lists:map(
+                    fun
+                        (<<Prefix:LenAlterPath/binary, Link/binary>>) when Prefix =:= AlterPath ->
+                            trim(Link);
+                        (Link) -> Link
+                    end, ObjLinkList),
+            {AlterPath, WithOutPrefix}
+    end.
+
+drop_attr(LinkList) ->
+    lists:foldr(
+        fun(Link, {AlternatePath, LinkAcc}) ->
+            {MainLink, LinkAttrs} = parse_link(Link),
+            case is_alternate_path(LinkAttrs) of
+                false -> {AlternatePath, [MainLink | LinkAcc]};
+                true  -> {MainLink, LinkAcc}
+            end
+        end, {<<"/">>, []}, LinkList).
+
+is_alternate_path(#{<<"rt">> := ?OMA_ALTER_PATH_RT}) -> true;
+is_alternate_path(_) -> false.
+
+parse_link(Link) ->
+    [MainLink | Attrs] = binary:split(trim(Link), <<";">>, [global]),
+    {delink(trim(MainLink)), parse_link_attrs(Attrs)}.
+
+parse_link_attrs(LinkAttrs) when is_list(LinkAttrs) ->
+    lists:foldl(
+        fun(Attr, Acc) ->
+            case binary:split(trim(Attr), <<"=">>) of
+                [AttrKey, AttrValue] when AttrKey =/= <<>> ->
+                    maps:put(AttrKey, AttrValue, Acc);
+                _BadAttr -> throw({bad_attr, _BadAttr})
+            end
+        end, maps:new(), LinkAttrs).
+
+trim(Str)-> binary_util:trim(Str, $ ).
+delink(Str) ->
+    Ltrim = binary_util:ltrim(Str, $<),
+    binary_util:rtrim(Ltrim, $>).
+
+% don't check the lwm2m version for now
+%check_lwm2m_version(_) -> true;
 
 check_lwm2m_version(<<"1.0">>) -> true;
 check_lwm2m_version(<<"1">>)   -> true;
@@ -174,14 +283,18 @@ check_epn(undefined) -> false;
 check_epn(_)         -> true.
 
 check_lifetime(undefined) -> false;
-check_lifetime(_)         -> true.
+check_lifetime(LifeTime) when LifeTime >= 300, LifeTime =< 86400 -> true;
+check_lifetime(_)         -> false.
 
 
 quit(ChId) ->
     self() !{coap_error, ChId, undefined, [], shutdown}.
 
+assign_location_path(Epn) ->
+    %Location = list_to_binary(io_lib:format("~.16B", [rand:uniform(65535)])),
+    %LocationPath = <<"/rd/", Location/binary>>,
+    Location = [<<"rd">>, Epn],
+    put(lwm2m_context, #lwm2m_context{epn = Epn, location = binary_util:join_path(Location)}),
+    Location.
 
 % end of file
-
-
-
