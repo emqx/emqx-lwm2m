@@ -49,7 +49,7 @@
                       clean_sess, proto_ver, proto_name, username, is_superuser,
                       will_msg, keepalive, keepalive_backoff, max_clientid_len,
                       session, stats_data, mountpoint, ws_initial_headers,
-                      peercert_username, is_bridge, connected_at, headers = [], proto, status}).
+                      peercert_username, is_bridge, connected_at, headers = [], proto}).
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
@@ -76,10 +76,9 @@ send_ul_data(ChId, EventType, Payload) ->
 %%--------------------------------------------------------------------
 
 init({CoapPid, ClientId, ChId, RegInfo = #{<<"lt">> := LifeTime}}) ->
-    LwM2MOpts = get_headers(RegInfo),
-    case proto_init(ClientId, undefined, undefined, ChId, LifeTime, LwM2MOpts) of
+    case proto_init(ClientId, undefined, undefined, ChId, LifeTime, []) of
         {ok, Proto} ->
-            ?LOG(debug, "start adapter ClientId=~p, ChId=~p, LwM2MOpts=~p", [ClientId, ChId, LwM2MOpts]),
+            ?LOG(debug, "start adapter ClientId=~p, ChId=~p", [ClientId, ChId]),
             self() ! post_init_process,
             {ok, #state{
                 coap_pid = CoapPid,
@@ -129,11 +128,10 @@ handle_cast({update_reg_info, NewRegInfo}, State=#state{life_timer = LifeTimer, 
 
     %% - report the registration info update, but only when objectList is updated.
     NewProto = case NewRegInfo of
-                   #{<<"objectList">> := _} ->
-                       UpdatePayload = append_device_id(#{<<"data">> => UpdatedRegInfo}, Proto),
-                       send_data(<<"update">>, UpdatePayload, Proto);
-                   _ -> Proto
-               end,
+        #{<<"objectList">> := _} ->
+            send_data(<<"update">>, #{<<"data">> => UpdatedRegInfo}, Proto);
+        _ -> Proto
+    end,
 
     %% - flush cached donwlink commands
     flush_cached_downlink_messages(CoapPid),
@@ -144,9 +142,7 @@ handle_cast({update_reg_info, NewRegInfo}, State=#state{life_timer = LifeTimer, 
 
 handle_cast({replace_reg_info, NewRegInfo}, State=#state{life_timer = LifeTimer, proto = Proto, coap_pid = CoapPid}) ->
     UpdatedLifeTimer = emqx_lwm2m_timer:refresh_timer(maps:get(<<"lt">>, NewRegInfo), LifeTimer),
-
-    UpdatePayload = append_device_id(#{<<"data">> => NewRegInfo}, Proto),
-    NewProto = send_data(<<"register">>, UpdatePayload, Proto),
+    NewProto = send_data(<<"register">>, #{<<"data">> => NewRegInfo}, Proto),
 
     flush_cached_downlink_messages(CoapPid),
     {noreply, State#state{life_timer = UpdatedLifeTimer, reg_info = NewRegInfo, proto = NewProto}, hibernate};
@@ -174,8 +170,7 @@ handle_info(post_init_process, State = #state{proto = Proto, reg_info = RegInfo,
     Proto1 = proto_subscribe(Topic, Qos, Proto),
 
     %% - report the registration info
-    RegPayload = append_device_id(#{<<"data">> => RegInfo}, Proto),
-    Proto2 = send_data(<<"register">>, RegPayload, Proto1),
+    Proto2 = send_data(<<"register">>, #{<<"data">> => RegInfo}, Proto1),
 
     %% - auto observe the objects, for demo only
     case proplists:get_value(lwm2m_auto_observe, Proto#proto_state.headers, false) of
@@ -184,10 +179,7 @@ handle_info(post_init_process, State = #state{proto = Proto, reg_info = RegInfo,
             auto_observe(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto);
         _ -> ok
     end,
-
-    %% add the protocol type into proto_state.headers
-    Proto3 = append_lwm2m_proto_type(RegInfo, Proto2),
-    {noreply, State#state{proto = Proto3, sub_topic = Topic}};
+    {noreply, State#state{proto = Proto2, sub_topic = Topic}};
 
 handle_info({life_timer, expired}, State) ->
     ?LOG(debug, "LifeTime expired", []),
@@ -300,31 +292,15 @@ deliver_to_coap(AlternatePath, JsonData, CoapPid, Proto, CacheMode) when is_bina
                 [JsonData, {ExClass, Error}, erlang:get_stacktrace()])
     end;
 
-deliver_to_coap(AlternatePath, TermData, CoapPid, Proto, CacheMode) when is_map(TermData) ->
+deliver_to_coap(AlternatePath, TermData, CoapPid, _Proto, CacheMode) when is_map(TermData) ->
     ?LOG(info, "SEND To CoAP, AlternatePath=~p, Data=~p", [AlternatePath, TermData]),
-    Payload = append_device_id(TermData, Proto),
-    Lwm2mProtoType = proplists:get_value(<<"protocolType">>, Proto#proto_state.headers, 1),
-    {CoapRequest, Ref} = emqx_lwm2m_cmd_handler:mqtt_payload_to_coap_request(AlternatePath, Payload, Lwm2mProtoType),
-
+    {CoapRequest, Ref} = emqx_lwm2m_cmd_handler:mqtt_payload_to_coap_request(AlternatePath, TermData),
     case CacheMode of
         false ->
             do_deliver_to_coap(CoapPid, CoapRequest, Ref);
         true ->
             cache_downlink_message(CoapRequest, Ref)
     end.
-
-append_device_id(Report = #{}, #proto_state{client_id = ClientID, headers = Headers}) ->
-    IMEI = proplists:get_value(imei, Headers, ClientID),
-    IMSI = proplists:get_value(imsi, Headers, <<"undefined">>),
-    Report#{
-        <<"imei">> => IMEI,
-        <<"imsi">> => IMSI
-    }.
-
-append_lwm2m_proto_type(#{<<"ct">> := _IOTVer}, Proto) ->
-    Proto#proto_state{headers = [{<<"protocolType">>, 2} | Proto#proto_state.headers]};
-append_lwm2m_proto_type(_, Proto) ->
-    Proto#proto_state{headers = [{<<"protocolType">>, 1} | Proto#proto_state.headers]}.
 
 downlink_topic(EventType, #proto_state{client_id = ClientID, headers = Headers}) ->
     proplists:get_value(downlink_topic_key(EventType), Headers, default_downlink_topic(EventType, ClientID)).
@@ -368,12 +344,9 @@ auto_observe(AlternatePath, ObjectList, CoapPid, Proto) ->
         end).
 
 observe_object_list(AlternatePath, ObjectList, CoapPid, Proto) ->
-    lists:foreach(fun
-            (<<"/19", _/binary>>) ->
-                observe_object_slowly(AlternatePath, <<"/19/0/0">>, CoapPid, Proto, 100);
-            (ObjectPath) when is_binary(ObjectPath) ->
-                observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, 100)
-        end, ObjectList).
+    lists:foreach(fun(ObjectPath) ->
+        observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, 100)
+    end, ObjectList).
 
 observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, Interval) ->
     observe_object(AlternatePath, ObjectPath, CoapPid, Proto),
@@ -388,21 +361,6 @@ observe_object(AlternatePath, ObjectPath, CoapPid, Proto) ->
     },
     ?LOG(info, "Observe ObjectPath: ~p", [ObjectPath]),
     deliver_to_coap(AlternatePath, Payload, CoapPid, Proto, false).
-
-get_headers(RegInfo) ->
-    get_headers(RegInfo, []).
-
-get_headers(RegInfo = #{<<"apn">> := APN}, Headers) ->
-    get_headers(maps:remove(<<"apn">>, RegInfo), [{apn, APN} | Headers]);
-get_headers(RegInfo = #{<<"im">> := IM}, Headers) ->
-    get_headers(maps:remove(<<"im">>, RegInfo), [{im, IM} | Headers]);
-get_headers(RegInfo = #{<<"ct">> := CT}, Headers) ->
-    get_headers(maps:remove(<<"ct">>, RegInfo), [{ct, CT} | Headers]);
-get_headers(RegInfo = #{<<"mv">> := MV}, Headers) ->
-    get_headers(maps:remove(<<"mv">>, RegInfo), [{mv, MV} | Headers]);
-get_headers(RegInfo = #{<<"mt">> := MT}, Headers) ->
-    get_headers(maps:remove(<<"mt">>, RegInfo), [{mt, MT} | Headers]);
-get_headers(_, Headers) -> Headers.
 
 cache_downlink_message(CoapRequest, Ref) ->
     ?LOG(debug, "Cache downlink coap request: ~p, Ref: ~p", [CoapRequest, Ref]),

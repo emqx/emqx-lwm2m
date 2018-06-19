@@ -21,24 +21,24 @@
 -include("emqx_lwm2m.hrl").
 -include_lib("lwm2m_coap/include/coap.hrl").
 
--export([mqtt_payload_to_coap_request/3, coap_response_to_mqtt_payload/4]).
+-export([mqtt_payload_to_coap_request/2, coap_response_to_mqtt_payload/4]).
 
 -define(LOG(Level, Format, Args), lager:Level("LWM2M-CNVT: " ++ Format, Args)).
 
-mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"read">>, <<"data">> := Data}, _Lwm2mProtoType) ->
+mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"read">>, <<"data">> := Data}) ->
     FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
     {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}]), InputCmd};
-mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"write">>, <<"data">> := Data}, Lwm2mProtoType) ->
+mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"write">>, <<"data">> := Data}) ->
     CoapRequest =
         case maps:get(<<"basePath">>, Data, <<"/">>) of
             <<"/">> ->
-                single_write_request(AlternatePath, Data, Lwm2mProtoType);
+                single_write_request(AlternatePath, Data);
             BasePath ->
                 batch_write_request(AlternatePath, BasePath, maps:get(<<"content">>, Data))
         end,
     {CoapRequest, InputCmd};
 
-mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"execute">>, <<"data">> := Data}, _Lwm2mProtoType) ->
+mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"execute">>, <<"data">> := Data}) ->
     FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
     Args = 
         case maps:get(<<"args">>, Data, <<>>) of
@@ -47,14 +47,14 @@ mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"exe
             Arg1 -> Arg1
         end,
     {lwm2m_coap_message:request(con, post, Args, [{uri_path, FullPathList}, {content_format, <<"text/plain">>}]), InputCmd};
-mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"discover">>, <<"data">> := Data}, _Lwm2mProtoType) ->
+mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"discover">>, <<"data">> := Data}) ->
     FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
     {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}, {'accept', ?LWM2M_FORMAT_LINK}]), InputCmd};
-mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"write-attr">>, <<"data">> := Data}, _Lwm2mProtoType) ->
+mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"write-attr">>, <<"data">> := Data}) ->
     FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
     Query = attr_query_list(Data),
     {lwm2m_coap_message:request(con, put, <<>>, [{uri_path, FullPathList}, {uri_query, Query}]), InputCmd};
-mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"observe">>, <<"data">> := Data}, _Lwm2mProtoType) ->
+mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"observe">>, <<"data">> := Data}) ->
     PathList = path_list(maps:get(<<"path">>, Data)),
     InputCmd2 =
         case hd(PathList) of
@@ -63,7 +63,7 @@ mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"obs
         end,
     FullPathList = add_alternate_path_prefix(AlternatePath, PathList),
     {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}, {observe, 0}]), InputCmd2};
-mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"cancel-observe">>, <<"data">> := Data}, _Lwm2mProtoType) ->
+mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"cancel-observe">>, <<"data">> := Data}) ->
     PathList = path_list(maps:get(<<"path">>, Data)),
     InputCmd2 =
         case hd(PathList) of
@@ -243,19 +243,13 @@ batch_write_request(AlternatePath, BasePath, Content) ->
     Payload = emqx_lwm2m_tlv:encode(TlvData),
     lwm2m_coap_message:request(con, Method, Payload, [{uri_path, FullPathList}, {content_format, <<"application/vnd.oma.lwm2m+tlv">>}]).
 
-single_write_request(AlternatePath, Data, Lwm2mProtoType) ->
+single_write_request(AlternatePath, Data) ->
     PathList = path_list(maps:get(<<"path">>, Data)),
     FullPathList = add_alternate_path_prefix(AlternatePath, PathList),
-    case {PathList, Lwm2mProtoType} of
-        {[<<"19">>, <<"1">>, <<"0">>], 2} ->
-            Value = base64:decode(maps:get(<<"value">>, Data)),
-            lwm2m_coap_message:request(con, put, Value, [{uri_path, FullPathList}, {content_format, <<"application/octet-stream">>}]);
-        {_, _} ->
-            %% TO DO: handle write to resource instance, e.g. /4/0/1/0
-            TlvData = emqx_lwm2m_message:json_to_tlv(PathList, [Data]),
-            Payload = emqx_lwm2m_tlv:encode(TlvData),
-            lwm2m_coap_message:request(con, put, Payload, [{uri_path, FullPathList}, {content_format, <<"application/vnd.oma.lwm2m+tlv">>}])
-    end.
+    %% TO DO: handle write to resource instance, e.g. /4/0/1/0
+    TlvData = emqx_lwm2m_message:json_to_tlv(PathList, [Data]),
+    Payload = emqx_lwm2m_tlv:encode(TlvData),
+    lwm2m_coap_message:request(con, put, Payload, [{uri_path, FullPathList}, {content_format, <<"application/vnd.oma.lwm2m+tlv">>}]).
 
 code(get) -> <<"0.01">>;
 code(post) -> <<"0.02">>;
