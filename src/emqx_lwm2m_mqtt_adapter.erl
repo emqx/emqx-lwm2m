@@ -172,13 +172,17 @@ handle_info(post_init_process, State = #state{proto = Proto, reg_info = RegInfo,
     %% - report the registration info
     Proto2 = send_data(<<"register">>, #{<<"data">> => RegInfo}, Proto1),
 
+    #{<<"alternatePath">> := AlternatePath} = RegInfo,
     %% - auto observe the objects, for demo only
     case proplists:get_value(lwm2m_auto_observe, Proto#proto_state.headers, false) of
         true ->
-            #{<<"alternatePath">> := AlternatePath} = RegInfo,
             auto_observe(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto);
         _ -> ok
     end,
+
+    %% - auto discover resources
+    auto_discover(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto),
+
     {noreply, State#state{proto = Proto2, sub_topic = Topic}};
 
 handle_info({life_timer, expired}, State) ->
@@ -360,8 +364,24 @@ observe_object(AlternatePath, ObjectPath, CoapPid, Proto) ->
         }
     },
     ?LOG(info, "Observe ObjectPath: ~p", [ObjectPath]),
-    deliver_to_coap(AlternatePath, ObservePayload, CoapPid, Proto, false),
+    deliver_to_coap(AlternatePath, ObservePayload, CoapPid, Proto, false).
 
+
+auto_discover(AlternatePath, ObjectList, CoapPid, Proto) ->
+    erlang:spawn(fun() ->
+            discover_object_list(AlternatePath, ObjectList, CoapPid, Proto)
+        end).
+
+discover_object_list(AlternatePath, ObjectList, CoapPid, Proto) ->
+    lists:foreach(fun(ObjectPath) ->
+        discover_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, 100)
+    end, ObjectList).
+
+discover_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, Interval) ->
+    discover_object(AlternatePath, ObjectPath, CoapPid, Proto),
+    timer:sleep(Interval).
+
+discover_object(AlternatePath, ObjectPath, CoapPid, Proto) ->
     DiscoverPayload = #{
         <<"msgType">> => <<"discover">>,
         <<"data">> => #{
