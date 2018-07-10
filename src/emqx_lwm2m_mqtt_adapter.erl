@@ -353,14 +353,23 @@ observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, Interval) ->
     timer:sleep(Interval).
 
 observe_object(AlternatePath, ObjectPath, CoapPid, Proto) ->
-    Payload = #{
+    ObservePayload = #{
         <<"msgType">> => <<"observe">>,
         <<"data">> => #{
             <<"path">> => ObjectPath
         }
     },
     ?LOG(info, "Observe ObjectPath: ~p", [ObjectPath]),
-    deliver_to_coap(AlternatePath, Payload, CoapPid, Proto, false).
+    deliver_to_coap(AlternatePath, ObservePayload, CoapPid, Proto, false),
+
+    DiscoverPayload = #{
+        <<"msgType">> => <<"discover">>,
+        <<"data">> => #{
+            <<"path">> => ObjectPath
+        }
+    },
+    ?LOG(info, "Discover ObjectPath: ~p", [ObjectPath]),
+    deliver_to_coap(AlternatePath, DiscoverPayload, CoapPid, Proto, false).
 
 cache_downlink_message(CoapRequest, Ref) ->
     ?LOG(debug, "Cache downlink coap request: ~p, Ref: ~p", [CoapRequest, Ref]),
