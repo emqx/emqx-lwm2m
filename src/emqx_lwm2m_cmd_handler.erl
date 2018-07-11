@@ -111,8 +111,13 @@ coap_execute_response_to_mqtt_payload({error, Error}, Ref) ->
     make_response(Error, Ref).
 
 coap_discover_response_to_mqtt_payload({ok, content}, CoapPayload, Ref) ->
-    Links = binary:split(CoapPayload, <<",">>),
-    make_response(content, Ref, <<"application/link-format">>, Links);
+    Links = binary:split(CoapPayload, <<",">>, [global]),
+    DecodedLinks =
+        lists:map(fun(Link) ->
+            {Path, Attrs} = emqx_lwm2m_coap_resource:parse_link(Link),
+            maps:put(<<"path">>, Path, Attrs)
+        end, Links),
+    make_response(content, Ref, <<"application/link-format">>, DecodedLinks);
 coap_discover_response_to_mqtt_payload({error, Error}, _CoapPayload, Ref) ->
     make_response(Error, Ref).
 

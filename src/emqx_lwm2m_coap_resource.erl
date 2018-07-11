@@ -29,7 +29,7 @@
 -behaviour(lwm2m_coap_resource).
 
 -export([coap_discover/2, coap_get/4, coap_post/4, coap_put/4, coap_delete/3,
-    coap_observe/4, coap_unobserve/1, handle_info/2, coap_ack/2]).
+    coap_observe/4, coap_unobserve/1, handle_info/2, coap_ack/2, parse_link/1]).
 
 -export([parse_object_list/1]).
 
