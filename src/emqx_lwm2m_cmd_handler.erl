@@ -40,7 +40,7 @@ mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"wri
 
 mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"execute">>, <<"data">> := Data}) ->
     FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
-    Args = 
+    Args =
         case maps:get(<<"args">>, Data, <<>>) of
             <<"undefined">> -> <<>>;
             undefined -> <<>>;
@@ -56,22 +56,12 @@ mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"wri
     {lwm2m_coap_message:request(con, put, <<>>, [{uri_path, FullPathList}, {uri_query, Query}]), InputCmd};
 mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"observe">>, <<"data">> := Data}) ->
     PathList = path_list(maps:get(<<"path">>, Data)),
-    InputCmd2 =
-        case hd(PathList) of
-            <<"19">> -> InputCmd#{observe_type => idiot};
-            _ -> InputCmd#{observe_type => standard}
-        end,
     FullPathList = add_alternate_path_prefix(AlternatePath, PathList),
-    {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}, {observe, 0}]), InputCmd2};
+    {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}, {observe, 0}]), InputCmd};
 mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"cancel-observe">>, <<"data">> := Data}) ->
     PathList = path_list(maps:get(<<"path">>, Data)),
-    InputCmd2 =
-        case hd(PathList) of
-            <<"19">> -> InputCmd#{observe_type => idiot};
-            _ -> InputCmd#{observe_type => standard}
-        end,
     FullPathList = add_alternate_path_prefix(AlternatePath, PathList),
-    {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}, {observe, 1}]), InputCmd2}.
+    {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}, {observe, 1}]), InputCmd}.
 
 coap_response_to_mqtt_payload(Method, CoapPayload, Options, Ref=#{<<"msgType">> := <<"read">>}) ->
     coap_read_response_to_mqtt_payload(Method, CoapPayload, data_format(Options), Ref);
@@ -84,7 +74,7 @@ coap_response_to_mqtt_payload(Method, CoapPayload, _Options, Ref=#{<<"msgType">>
 coap_response_to_mqtt_payload(Method, CoapPayload, _Options, Ref=#{<<"msgType">> := <<"write-attr">>}) ->
     coap_writeattr_response_to_mqtt_payload(Method, CoapPayload, Ref);
 coap_response_to_mqtt_payload(Method, CoapPayload, Options, Ref=#{<<"msgType">> := <<"observe">>}) ->
-    coap_observe_response_to_mqtt_payload(Method, CoapPayload, data_format(Options), observe_seq(Options, Ref), Ref);
+    coap_observe_response_to_mqtt_payload(Method, CoapPayload, data_format(Options), observe_seq(Options), Ref);
 coap_response_to_mqtt_payload(Method, CoapPayload, Options, Ref=#{<<"msgType">> := <<"cancel-observe">>}) ->
     coap_cancel_observe_response_to_mqtt_payload(Method, CoapPayload, data_format(Options), Ref).
 
@@ -133,12 +123,10 @@ coap_writeattr_response_to_mqtt_payload({error, Error}, _CoapPayload, Ref) ->
 
 coap_observe_response_to_mqtt_payload({error, Error}, _CoapPayload, _Format, _ObserveSeqNum, Ref) ->
     make_response(Error, Ref);
-coap_observe_response_to_mqtt_payload({ok, content}, CoapPayload, Format, 0, Ref) ->
-    coap_read_response_to_mqtt_payload({ok, content}, CoapPayload, Format, Ref);
+
 coap_observe_response_to_mqtt_payload({ok, content}, CoapPayload, Format, ObserveSeqNum, Ref) ->
     RefWithObserve = maps:put(<<"seqNum">>, ObserveSeqNum, Ref),
-    RefNotify = maps:put(<<"msgType">>, <<"notify">>, RefWithObserve),
-    coap_read_response_to_mqtt_payload({ok, content}, CoapPayload, Format, RefNotify).
+    coap_read_response_to_mqtt_payload({ok, content}, CoapPayload, Format, RefWithObserve).
 
 coap_cancel_observe_response_to_mqtt_payload({ok, content}, CoapPayload, Format, Ref) ->
     coap_read_response_to_mqtt_payload({ok, content}, CoapPayload, Format, Ref);
@@ -214,9 +202,7 @@ valid_attr_keys() ->
 
 data_format(Options) ->
     proplists:get_value(content_format, Options, <<"text/plain">>).
-observe_seq(Options, #{observe_type := idiot}) ->
-    proplists:get_value(observe, Options, rand:uniform(1000000) + 1 );
-observe_seq(Options, #{observe_type := standard}) ->
+observe_seq(Options) ->
     proplists:get_value(observe, Options, 0).
 
 add_alternate_path_prefix(<<"/">>, PathList) ->

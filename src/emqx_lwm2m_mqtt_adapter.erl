@@ -327,13 +327,6 @@ default_uplink_topic(<<"notify">>, ClientID) ->
 default_uplink_topic(Type, ClientID) when is_binary(Type) ->
     {<<"lwm2m/", ClientID/binary, "/up/dm">>, 0}.
 
-send_data(EventType, Payload = #{}, Proto)
-        when %% Send an extra "notify" for "observe" and "cancel-observe" responses
-            EventType =:= <<"observe">>;
-            EventType =:= <<"cancel-observe">>
-        ->
-    do_send_data(<<"notify">>, Payload, Proto),
-    do_send_data(EventType, Payload, Proto);
 send_data(EventType, Payload = #{}, Proto) ->
     do_send_data(EventType, Payload, Proto).
 
