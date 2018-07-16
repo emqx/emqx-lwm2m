@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2016-2017 EMQ Enterprise, Inc. (http://emqtt.io)
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,7 +11,6 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module(emqx_lwm2m_SUITE).
 
@@ -20,31 +18,27 @@
 
 -define(PORT, 5783).
 
--define(LOGT(Format, Args), lager:debug("TEST_SUITE: " ++ Format, Args)).
+-define(LOGT(Format, Args), ct:print("TEST_SUITE: " ++ Format, Args)).
 
 -include("emqx_lwm2m.hrl").
 -include_lib("lwm2m_coap/include/coap.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-
-all() -> [case01_register, case02_update_deregister, case03_register_wrong_version,
-    case04_register_and_lifetime_timeout, case05_register_wrong_epn, case06_register_wrong_lifetime,
-    case10_read, case11_read_object_tlv, case11_read_object_json, case12_read_resource_opaque, case13_read_no_xml,
-    case20_write, case21_write_object, case22_write_error,
-    case30_execute, case31_execute_error,
-    case40_discover,
-    case50_write_attribute,
-    case60_observe].
-
-
+all() ->
+    [case01_register, case02_update_deregister, case03_register_wrong_version,
+     case04_register_and_lifetime_timeout, case05_register_wrong_epn, case06_register_wrong_lifetime,
+     case10_read, case11_read_object_tlv, case11_read_object_json, case12_read_resource_opaque, case13_read_no_xml,
+     case20_write, case21_write_object, case22_write_error,
+     case30_execute, case31_execute_error,
+     case40_discover,
+     case50_write_attribute,
+     case60_observe].
 
 init_per_suite(Config) ->
-    lager_common_test_backend:bounce(debug),
     Config.
 
 end_per_suite(Config) ->
     Config.
-
 
 case01_register(_Config) ->
     application:set_env(?APP, port, ?PORT),
@@ -334,9 +328,6 @@ case10_read(_Config) ->
     ok = application:stop(emqx_lwm2m),
     ok = application:stop(lwm2m_coap),
     test_mqtt_broker:stop().
-
-
-
 
 case11_read_object_tlv(_Config) ->
     application:set_env(?APP, port, ?PORT),
@@ -1282,9 +1273,6 @@ join_path([], Acc) ->
 join_path([H|T], Acc) ->
     join_path(T, <<Acc/binary, $/, H/binary>>).
 
-
-
 sprintf(Format, Args) ->
     lists:flatten(io_lib:format(Format, Args)).
-
 

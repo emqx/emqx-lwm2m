@@ -4,12 +4,12 @@ PROJECT_VERSION = 3.0
 
 DEPS = lwm2m_coap jsx clique
 dep_lwm2m_coap = git https://github.com/grutabow/lwm2m-coap
-dep_jsx        = git https://github.com/talentdeficit/jsx
-dep_clique     = git https://github.com/emqtt/clique
+dep_jsx        = git https://github.com/talentdeficit/jsx v2.9.0
+dep_clique     = git https://github.com/emqx/clique
 
 BUILD_DEPS = emqx cuttlefish
 dep_emqx       = git https://github.com/emqtt/emqttd emqx30
-dep_cuttlefish = git https://github.com/emqtt/cuttlefish
+dep_cuttlefish = git https://github.com/emqx/cuttlefish
 
 ERLC_OPTS += +debug_inf
 ERLC_OPTS += +'{parse_transform, lager_transform}'
