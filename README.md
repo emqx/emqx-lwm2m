@@ -2,7 +2,7 @@
 emqx_lwm2m
 ==========
 
-LWM2M Gateway for the EMQ X Broker
+EMQ X LwM2M Gateway.
 
 LWM2M is Lightweight Machine to Machine protocol. Its standard can be found [here](http://www.openmobilealliance.org/release/LightweightM2M).
 
