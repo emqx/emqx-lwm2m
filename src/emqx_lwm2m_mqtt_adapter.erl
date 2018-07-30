@@ -127,10 +127,11 @@ handle_cast({update_reg_info, NewRegInfo}, State=#state{life_timer = LifeTimer, 
     UpdatedRegInfo = maps:merge(RegInfo, NewRegInfo),
 
     %% - report the registration info update, but only when objectList is updated.
-    NewProto = case NewRegInfo of
-        #{<<"objectList">> := _} ->
-            send_data(<<"update">>, #{<<"data">> => UpdatedRegInfo}, Proto);
-        _ -> Proto
+    case NewRegInfo of
+        #{<<"alternatePath">> := AlternatePath, <<"objectList">> := _} ->
+            %send_data(<<"update">>, #{<<"data">> => UpdatedRegInfo}, Proto);
+            auto_discover(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto);
+        _ -> ok
     end,
 
     %% - flush cached donwlink commands
@@ -138,14 +139,18 @@ handle_cast({update_reg_info, NewRegInfo}, State=#state{life_timer = LifeTimer, 
 
     %% - update the life timer
     UpdatedLifeTimer = emqx_lwm2m_timer:refresh_timer(maps:get(<<"lt">>, UpdatedRegInfo), LifeTimer),
-    {noreply, State#state{life_timer = UpdatedLifeTimer, reg_info = UpdatedRegInfo, proto = NewProto}, hibernate};
+    {noreply, State#state{life_timer = UpdatedLifeTimer, reg_info = UpdatedRegInfo, proto = Proto}, hibernate};
 
-handle_cast({replace_reg_info, NewRegInfo}, State=#state{life_timer = LifeTimer, proto = Proto, coap_pid = CoapPid}) ->
+handle_cast({replace_reg_info, NewRegInfo}, State=#state{reg_info = RegInfo, life_timer = LifeTimer, proto = Proto, coap_pid = CoapPid}) ->
     UpdatedLifeTimer = emqx_lwm2m_timer:refresh_timer(maps:get(<<"lt">>, NewRegInfo), LifeTimer),
-    NewProto = send_data(<<"register">>, #{<<"data">> => NewRegInfo}, Proto),
+    %NewProto = send_data(<<"register">>, #{<<"data">> => NewRegInfo}, Proto),
 
     flush_cached_downlink_messages(CoapPid),
-    {noreply, State#state{life_timer = UpdatedLifeTimer, reg_info = NewRegInfo, proto = NewProto}, hibernate};
+
+    #{<<"alternatePath">> := AlternatePath} = RegInfo,
+    auto_discover(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto),
+    
+    {noreply, State#state{life_timer = UpdatedLifeTimer, reg_info = NewRegInfo, proto = Proto}, hibernate};
 
 handle_cast(Msg, State) ->
     ?LOG(error, "unexpected cast ~p", [Msg]),
@@ -170,7 +175,7 @@ handle_info(post_init_process, State = #state{proto = Proto, reg_info = RegInfo,
     Proto1 = proto_subscribe(Topic, Qos, Proto),
 
     %% - report the registration info
-    Proto2 = send_data(<<"register">>, #{<<"data">> => RegInfo}, Proto1),
+    %Proto2 = send_data(<<"register">>, #{<<"data">> => RegInfo}, Proto1),
 
     #{<<"alternatePath">> := AlternatePath} = RegInfo,
     %% - auto observe the objects, for demo only
@@ -183,7 +188,7 @@ handle_info(post_init_process, State = #state{proto = Proto, reg_info = RegInfo,
     %% - auto discover resources
     auto_discover(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto),
 
-    {noreply, State#state{proto = Proto2, sub_topic = Topic}};
+    {noreply, State#state{proto = Proto1, sub_topic = Topic}};
 
 handle_info({life_timer, expired}, State) ->
     ?LOG(debug, "LifeTime expired", []),
@@ -377,6 +382,8 @@ discover_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, Interval) ->
 discover_object(AlternatePath, ObjectPath, CoapPid, Proto) ->
     DiscoverPayload = #{
         <<"msgType">> => <<"discover">>,
+        <<"objectPath">> => ObjectPath,
+        <<"initiator">> => lwm2m_gw,
         <<"data">> => #{
             <<"path">> => ObjectPath
         }

@@ -69,6 +69,11 @@ coap_response_to_mqtt_payload(Method, _CoapPayload, _Options, Ref=#{<<"msgType">
     coap_write_response_to_mqtt_payload(Method, Ref);
 coap_response_to_mqtt_payload(Method, _CoapPayload, _Options, Ref=#{<<"msgType">> := <<"execute">>}) ->
     coap_execute_response_to_mqtt_payload(Method, Ref);
+coap_response_to_mqtt_payload(Method, CoapPayload, _Options, Ref=#{
+        <<"msgType">> := <<"discover">>,
+        <<"initiator">> := lwm2m_gw
+        }) ->
+    coap_discover_response_to_mqtt_payload(Method, CoapPayload, Ref, no_error);
 coap_response_to_mqtt_payload(Method, CoapPayload, _Options, Ref=#{<<"msgType">> := <<"discover">>}) ->
     coap_discover_response_to_mqtt_payload(Method, CoapPayload, Ref);
 coap_response_to_mqtt_payload(Method, CoapPayload, _Options, Ref=#{<<"msgType">> := <<"write-attr">>}) ->
@@ -113,13 +118,21 @@ coap_execute_response_to_mqtt_payload({error, Error}, Ref) ->
 coap_discover_response_to_mqtt_payload({ok, content}, CoapPayload, Ref) ->
     Links = binary:split(CoapPayload, <<",">>, [global]),
     DecodedLinks =
-        lists:map(fun(Link) ->
-            {Path, Attrs} = emqx_lwm2m_coap_resource:parse_link(Link),
-            maps:put(<<"path">>, Path, Attrs)
-        end, Links),
+        lists:foldr(
+          fun
+             (<<>>, Acc) ->
+               Acc;
+             (Link, Acc) ->
+               {Path, Attrs} = emqx_lwm2m_coap_resource:parse_link(Link),
+               [maps:put(<<"path">>, Path, Attrs) | Acc]
+          end, [], Links),
     make_response(content, Ref, <<"application/link-format">>, DecodedLinks);
 coap_discover_response_to_mqtt_payload({error, Error}, _CoapPayload, Ref) ->
     make_response(Error, Ref).
+coap_discover_response_to_mqtt_payload(OK = {ok, content}, CoapPayload, Ref, no_error) ->
+    coap_discover_response_to_mqtt_payload(OK, CoapPayload, Ref);
+coap_discover_response_to_mqtt_payload({error, _Error}, _CoapPayload, Ref, no_error) ->
+    coap_discover_response_to_mqtt_payload({ok, content}, <<>>, Ref).
 
 coap_writeattr_response_to_mqtt_payload({ok, changed}, _CoapPayload, Ref) ->
     make_response(changed, Ref);

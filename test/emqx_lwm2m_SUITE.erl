@@ -18,7 +18,7 @@
 
 -compile(export_all).
 
--define(PORT, 5783).
+-define(PORT, 5683).
 
 -define(LOGT(Format, Args), lager:debug("TEST_SUITE: " ++ Format, Args)).
 
@@ -131,7 +131,7 @@ end_per_testcase(_AllTestCase, Config) ->
 run_setup_steps(App) ->
     NewConfig = generate_config(App),
     lists:foreach(fun set_app_env/1, NewConfig),
-    application:ensure_all_started(App).
+    ok = application:ensure_all_started(App).
 
 generate_config(emqx) ->
     Schema = cuttlefish_schema:files([local_path(["deps","emqx", "priv", "emqx.schema"])]),
