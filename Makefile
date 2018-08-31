@@ -3,7 +3,7 @@ PROJECT_DESCRIPTION = EMQ X LwM2M Gateway
 PROJECT_VERSION = 3.0
 
 DEPS = lwm2m_coap jsx clique
-dep_lwm2m_coap = git https://github.com/grutabow/lwm2m-coap
+dep_lwm2m_coap = git https://github.com/emqx/lwm2m-coap v0.1.0
 dep_jsx        = git https://github.com/talentdeficit/jsx v2.9.0
 dep_clique     = git https://github.com/emqx/clique
 
