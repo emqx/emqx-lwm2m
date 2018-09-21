@@ -1,4 +1,5 @@
-%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
+%%--------------------------------------------------------------------
+%% Copyright (c) 2016-2017 EMQ Enterprise, Inc. (http://emqtt.io)
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -11,12 +12,15 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
+%%--------------------------------------------------------------------
 
 -module(emqx_lwm2m_registry).
 
--behaviour(gen_server).
+-author("Feng Lee <feng@emqtt.io>").
 
 -include("emqx_lwm2m.hrl").
+
+-behaviour(gen_server).
 
 %% API.
 -export([start_link/0, register_name/2, unregister_name/1, whereis_name/1, send/2, stop/0]).
@@ -30,7 +34,9 @@
 -define(RESPONSE_TAB, lwm2m_coap_response_process).
 -define(RESPONSE_REF_TAB, lwm2m_coap_response_process_ref).
 
--define(LOG(Level, Format, Args), ct:print("LWM2M-REG: " ++ Format, Args)).
+-define(LOG(Level, Format, Args),
+    lager:Level("LWM2M-REG: " ++ Format, Args)).
+
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -125,6 +131,8 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
+
+
 %%--------------------------------------------------------------------
 %% Internal functions
 %%--------------------------------------------------------------------
@@ -134,4 +142,3 @@ monitor_client(Pid) ->
 
 erase_monitor(MRef) ->
     catch erlang:demonitor(MRef, [flush]).
-

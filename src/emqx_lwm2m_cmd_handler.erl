@@ -1,4 +1,5 @@
-%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
+%%--------------------------------------------------------------------
+%% Copyright (c) 2016-2017 EMQ Enterprise, Inc. (http://emqtt.io)
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -11,155 +12,279 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
+%%--------------------------------------------------------------------
 
 -module(emqx_lwm2m_cmd_handler).
 
 -include("emqx_lwm2m.hrl").
 -include_lib("lwm2m_coap/include/coap.hrl").
 
--export([mqtt_payload_to_coap_request/1, coap_response_to_mqtt_payload/4]).
+-export([mqtt2coap/2,
+         coap2mqtt/4,
+         ack2mqtt/1
+         ]).
 
--define(LOG(Level, Format, Args),
-        emqx_logger:Level("LWM2M-CNVT: " ++ Format, Args)).
+-export([path_list/1]).
 
-mqtt_payload_to_coap_request(InputCmd = #{?MQ_COMMAND := <<"Read">>, ?MQ_BASENAME := Path}) ->
-    {_Method, PathList} = path_list(Path),
-    {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, PathList}]), InputCmd};
-mqtt_payload_to_coap_request(InputCmd = #{?MQ_COMMAND := <<"Write">>, ?MQ_VALUE := Value}) ->
-    #{<<"bn">>:=Path} = Value,
-    {Method, PathList} = path_list(Path),
-    TlvData = emqx_lwm2m_json:json_to_tlv(Value),
-    Payload = emqx_lwm2m_tlv:encode(TlvData),
-    CoapRequest = lwm2m_coap_message:request(con, Method, Payload, [{uri_path, PathList}, {content_format, <<"application/vnd.oma.lwm2m+tlv">>}]),
+-define(STANDARD, 1).
+
+-define(LOG(Level, Format, Args), lager:Level("LWM2M-CNVT: " ++ Format, Args)).
+
+mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"create">>, <<"data">> := Data}) ->
+    FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
+    {lwm2m_coap_message:request(con, post, <<>>, [{uri_path, FullPathList}]), InputCmd};
+mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"delete">>, <<"data">> := Data}) ->
+    FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
+    {lwm2m_coap_message:request(con, delete, <<>>, [{uri_path, FullPathList}]), InputCmd};
+mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"read">>, <<"data">> := Data}) ->
+    FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
+    {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}]), InputCmd};
+mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"write">>, <<"data">> := Data}) ->
+    CoapRequest =
+        case maps:get(<<"basePath">>, Data, <<"/">>) of
+            <<"/">> ->
+                single_write_request(AlternatePath, Data);
+            BasePath ->
+                batch_write_request(AlternatePath, BasePath, maps:get(<<"content">>, Data))
+        end,
     {CoapRequest, InputCmd};
-mqtt_payload_to_coap_request(InputCmd = #{?MQ_COMMAND := <<"Execute">>, ?MQ_BASENAME := Path}) ->
-    {_Method, PathList} = path_list(Path),
-    Payload =   case maps:get(?MQ_ARGS, InputCmd, undefined) of
-                    undefined -> <<>>;
-                    Data      -> Data
-                end,
-    {lwm2m_coap_message:request(con, post, Payload, [{uri_path, PathList}, {content_format, <<"text/plain">>}]), InputCmd};
-mqtt_payload_to_coap_request(InputCmd = #{?MQ_COMMAND := <<"Discover">>, ?MQ_BASENAME := Path}) ->
-    {_Method, PathList} = path_list(Path),
-    {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, PathList}, {'accept', ?LWM2M_FORMAT_LINK}]), InputCmd};
-mqtt_payload_to_coap_request(InputCmd = #{?MQ_COMMAND := <<"Write-Attributes">>, ?MQ_BASENAME := Path, ?MQ_VALUE := Query}) ->
-    {_Method, PathList} = path_list(Path),
-    {lwm2m_coap_message:request(con, put, <<>>, [{uri_path, PathList}, {uri_query, [Query]}]), InputCmd};
-mqtt_payload_to_coap_request(InputCmd = #{?MQ_COMMAND := <<"Observe">>, ?MQ_BASENAME := Path}) ->
-    {_Method, PathList} = path_list(Path),
-    {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, PathList}, {observe, 0}]), InputCmd}.
 
-coap_response_to_mqtt_payload(Method, CoapPayload, Format, Ref=#{?MQ_COMMAND := <<"Read">>}) ->
-    ?LOG(debug, "coap_response_to_mqtt_payload read Method=~p, CoapPayload=~p, Format=~p, Ref=~p", [Method, CoapPayload, Format, Ref]),
-    coap_read_response_to_mqtt_payload(Method, CoapPayload, Format, Ref);
-coap_response_to_mqtt_payload(Method, CoapPayload, Format, Ref=#{?MQ_COMMAND := <<"Write">>}) ->
-    ?LOG(debug, "coap_response_to_mqtt_payload write Method=~p, CoapPayload=~p, Format=~p, Ref=~p", [Method, CoapPayload, Format, Ref]),
-    coap_write_response_to_mqtt_payload(Method, Ref);
-coap_response_to_mqtt_payload(Method, CoapPayload, Format, Ref=#{?MQ_COMMAND := <<"Execute">>}) ->
-    ?LOG(debug, "coap_response_to_mqtt_payload execute Method=~p, CoapPayload=~p, Format=~p, Ref=~p", [Method, CoapPayload, Format, Ref]),
-    coap_execute_response_to_mqtt_payload(Method, Ref);
-coap_response_to_mqtt_payload(Method, CoapPayload, Format, Ref=#{?MQ_COMMAND := <<"Discover">>}) ->
-    ?LOG(debug, "coap_response_to_mqtt_payload discover Method=~p, CoapPayload=~p, Format=~p, Ref=~p", [Method, CoapPayload, Format, Ref]),
-    coap_discover_response_to_mqtt_payload(CoapPayload, Method, Ref);
-coap_response_to_mqtt_payload(Method, CoapPayload, Format, Ref=#{?MQ_COMMAND := <<"Write-Attributes">>}) ->
-    ?LOG(debug, "coap_response_to_mqtt_payload write-attribute Method=~p, CoapPayload=~p, Format=~p, Ref=~p", [Method, CoapPayload, Format, Ref]),
-    coap_writeattr_response_to_mqtt_payload(CoapPayload, Method, Ref);
-coap_response_to_mqtt_payload(Method, CoapPayload, Format, Ref=#{?MQ_COMMAND := <<"Observe">>}) ->
-    ?LOG(debug, "coap_response_to_mqtt_payload observe Method=~p, CoapPayload=~p, Format=~p, Ref=~p", [Method, CoapPayload, Format, Ref]),
-    coap_observe_response_to_mqtt_payload(Method, CoapPayload, Format, Ref).
+mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"execute">>, <<"data">> := Data}) ->
+    FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
+    Args =
+        case maps:get(<<"args">>, Data, <<>>) of
+            <<"undefined">> -> <<>>;
+            undefined -> <<>>;
+            Arg1 -> Arg1
+        end,
+    {lwm2m_coap_message:request(con, post, Args, [{uri_path, FullPathList}, {content_format, <<"text/plain">>}]), InputCmd};
+mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"discover">>, <<"data">> := Data}) ->
+    FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
+    {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}, {'accept', ?LWM2M_FORMAT_LINK}]), InputCmd};
+mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"write-attr">>, <<"data">> := Data}) ->
+    FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
+    Query = attr_query_list(Data),
+    {lwm2m_coap_message:request(con, put, <<>>, [{uri_path, FullPathList}, {uri_query, Query}]), InputCmd};
+mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"observe">>, <<"data">> := Data}) ->
+    PathList = path_list(maps:get(<<"path">>, Data)),
+    FullPathList = add_alternate_path_prefix(AlternatePath, PathList),
+    {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}, {observe, 0}]), InputCmd};
+mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"cancel-observe">>, <<"data">> := Data}) ->
+    PathList = path_list(maps:get(<<"path">>, Data)),
+    FullPathList = add_alternate_path_prefix(AlternatePath, PathList),
+    {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}, {observe, 1}]), InputCmd}.
 
-coap_read_response_to_mqtt_payload({error, Error}, _CoapPayload, _Format, Ref) ->
-    make_error(Ref, error_code(Error));
-coap_read_response_to_mqtt_payload({ok, content}, CoapPayload, Format, Ref) ->
-    coap_read_response_to_mqtt_payload2(CoapPayload, Format, Ref).
+coap2mqtt(_Method = {_, Code}, _CoapPayload, _Options, Ref=#{<<"msgType">> := <<"create">>}) ->
+    make_response(Code, Ref);
+coap2mqtt(_Method = {_, Code}, _CoapPayload, _Options, Ref=#{<<"msgType">> := <<"delete">>}) ->
+    make_response(Code, Ref);
+coap2mqtt(Method, CoapPayload, Options, Ref=#{<<"msgType">> := <<"read">>}) ->
+    coap_read_to_mqtt(Method, CoapPayload, data_format(Options), Ref);
+coap2mqtt(Method, _CoapPayload, _Options, Ref=#{<<"msgType">> := <<"write">>}) ->
+    coap_write_to_mqtt(Method, Ref);
+coap2mqtt(Method, _CoapPayload, _Options, Ref=#{<<"msgType">> := <<"execute">>}) ->
+    coap_execute_to_mqtt(Method, Ref);
+coap2mqtt(Method, CoapPayload, _Options, Ref=#{<<"msgType">> := <<"discover">>}) ->
+    coap_discover_to_mqtt(Method, CoapPayload, Ref);
+coap2mqtt(Method, CoapPayload, _Options, Ref=#{<<"msgType">> := <<"write-attr">>}) ->
+    coap_writeattr_to_mqtt(Method, CoapPayload, Ref);
+coap2mqtt(Method, CoapPayload, Options, Ref=#{<<"msgType">> := <<"observe">>}) ->
+    coap_observe_to_mqtt(Method, CoapPayload, data_format(Options), observe_seq(Options), Ref);
+coap2mqtt(Method, CoapPayload, Options, Ref=#{<<"msgType">> := <<"cancel-observe">>}) ->
+    coap_cancel_observe_to_mqtt(Method, CoapPayload, data_format(Options), Ref).
 
-coap_read_response_to_mqtt_payload2(CoapPayload, <<"text/plain">>, Ref=#{?MQ_BASENAME:=BaseName}) ->
-    case catch emqx_lwm2m_json:text_to_json(BaseName, CoapPayload) of
-        {'EXIT', {no_xml_definition, _}} -> make_error(Ref, ?ERR_NO_XML);
-        Result                           -> make_response(Ref, Result)
-    end;
-coap_read_response_to_mqtt_payload2(CoapPayload, <<"application/octet-stream">>, Ref=#{?MQ_BASENAME:=BaseName}) ->
-    case catch emqx_lwm2m_json:opaque_to_json(BaseName, CoapPayload) of
-        {'EXIT', {no_xml_definition, _}} -> make_error(Ref, ?ERR_NO_XML);
-        Result                           -> make_response(Ref, Result)
-    end;
-coap_read_response_to_mqtt_payload2(CoapPayload, <<"application/vnd.oma.lwm2m+tlv">>, Ref=#{?MQ_BASENAME:=BaseName}) ->
-    Decode = emqx_lwm2m_tlv:parse(CoapPayload),
-    case catch emqx_lwm2m_json:tlv_to_json(BaseName, Decode) of
-        {'EXIT', {no_xml_definition, _}} -> make_error(Ref, ?ERR_NO_XML);
-        Result                           -> make_response(Ref, Result)
-    end;
-coap_read_response_to_mqtt_payload2(CoapPayload, <<"application/vnd.oma.lwm2m+json">>, Ref) ->
-    Result = jsx:decode(CoapPayload),
-    make_response(Ref, Result).
-
-coap_write_response_to_mqtt_payload({ok, changed}, Ref) ->
-    make_response(Ref, <<"Changed">>);
-coap_write_response_to_mqtt_payload({error, Error}, Ref) ->
-    make_error(Ref, error_code(Error)).
-
-coap_execute_response_to_mqtt_payload({ok, changed}, Ref) ->
-    make_response(Ref, <<"Changed">>);
-coap_execute_response_to_mqtt_payload({error, Error}, Ref) ->
-    make_error(Ref, error_code(Error)).
-
-coap_discover_response_to_mqtt_payload(CoapPayload, {ok, content}, Ref) ->
-    make_response(Ref, CoapPayload);
-coap_discover_response_to_mqtt_payload(_CoapPayload, {error, Error}, Ref) ->
-    make_error(Ref, error_code(Error)).
-
-coap_writeattr_response_to_mqtt_payload(_CoapPayload, {ok, changed}, Ref) ->
-    make_response(Ref, <<"Changed">>);
-coap_writeattr_response_to_mqtt_payload(_CoapPayload, {error, Error}, Ref) ->
-    make_response(Ref, error_code(Error)).
-
-coap_observe_response_to_mqtt_payload({error, Error}, _CoapPayload, _Format, Ref) ->
-    make_error(Ref, error_code(Error));
-coap_observe_response_to_mqtt_payload({ok, content}, CoapPayload, Format, Ref) ->
-    coap_read_response_to_mqtt_payload2(CoapPayload, Format, Ref).
-
-make_response(Ref=#{}, Value) ->
-    ?LOG(debug, "make_response  Ref=~p, Error=~p", [Ref, Value]),
-    jsx:encode(#{
-                    ?MQ_COMMAND_ID  => maps:get(?MQ_COMMAND_ID, Ref),
-                    ?MQ_COMMAND     => maps:get(?MQ_COMMAND, Ref),
-                    ?MQ_RESULT      => Value
-                }).
-
-make_error(Ref=#{}, Error) ->
-    ?LOG(debug, "make_error  Ref=~p, Error=~p", [Ref, Error]),
-    jsx:encode(#{
-                    ?MQ_COMMAND_ID  => maps:get(?MQ_COMMAND_ID, Ref),
-                    ?MQ_COMMAND     => maps:get(?MQ_COMMAND, Ref),
-                    ?MQ_ERROR       => Error
-                }).
-
-error_code(not_acceptable) ->
-    ?ERR_NOT_ACCEPTABLE;
-error_code(method_not_allowed) ->
-    ?ERR_METHOD_NOT_ALLOWED;
-error_code(not_found) ->
-    ?ERR_NOT_FOUND;
-error_code(uauthorized) ->
-    ?ERR_UNAUTHORIZED;
-error_code(bad_request) ->
-    ?ERR_BAD_REQUEST.
-
-
-path_list(Path) ->
-    case binary:split(Path, [<<$/>>], [global]) of
-        [<<>>, ObjId, ObjInsId, ResId, <<>>] -> {put,  [ObjId, ObjInsId, ResId]};
-        [<<>>, ObjId, ObjInsId, ResId]       -> {put,  [ObjId, ObjInsId, ResId]};
-        [<<>>, ObjId, ObjInsId, <<>>]        -> {post, [ObjId, ObjInsId]};
-        [<<>>, ObjId, ObjInsId]              -> {post, [ObjId, ObjInsId]};
-        [<<>>, ObjId, <<>>]                  -> {post, [ObjId]};
-        [<<>>, ObjId]                        -> {post, [ObjId]};
-        [ObjId, ObjInsId, ResId, <<>>]       -> {put,  [ObjId, ObjInsId, ResId]};
-        [ObjId, ObjInsId, ResId]             -> {put,  [ObjId, ObjInsId, ResId]};
-        [ObjId, ObjInsId, <<>>]              -> {post, [ObjId, ObjInsId]};
-        [ObjId, ObjInsId]                    -> {post, [ObjId, ObjInsId]};
-        [ObjId, <<>>]                        -> {post, [ObjId]};
-        [ObjId]                              -> {post, [ObjId]}
+coap_read_to_mqtt({error, ErrorCode}, _CoapPayload, _Format, Ref) ->
+    make_response(ErrorCode, Ref);
+coap_read_to_mqtt({ok, SuccessCode}, CoapPayload, Format, Ref) ->
+    try
+        Result = coap_content_to_mqtt_payload(CoapPayload, Format, Ref),
+        make_response(SuccessCode, Ref, Format, Result)
+    catch
+        error:not_implemented -> make_response(not_implemented, Ref);
+        C:R:Stack ->
+            ?LOG(error, "~p, bad payload format: ~p, stacktrace: ~p", [{C, R}, CoapPayload, Stack]),
+            make_response(bad_request, Ref)
     end.
 
+ack2mqtt(Ref) ->
+    make_base_response(Ref).
 
+coap_content_to_mqtt_payload(CoapPayload, <<"text/plain">>, Ref) ->
+    emqx_lwm2m_message:text_to_json(extract_path(Ref), CoapPayload);
+coap_content_to_mqtt_payload(CoapPayload, <<"application/octet-stream">>, Ref) ->
+    emqx_lwm2m_message:opaque_to_json(extract_path(Ref), CoapPayload);
+coap_content_to_mqtt_payload(CoapPayload, <<"application/vnd.oma.lwm2m+tlv">>, Ref) ->
+    emqx_lwm2m_message:tlv_to_json(extract_path(Ref), CoapPayload);
+coap_content_to_mqtt_payload(CoapPayload, <<"application/vnd.oma.lwm2m+json">>, _Ref) ->
+    emqx_lwm2m_message:translate_json(CoapPayload).
+
+coap_write_to_mqtt({ok, changed}, Ref) ->
+    make_response(changed, Ref);
+coap_write_to_mqtt({error, Error}, Ref) ->
+    make_response(Error, Ref).
+
+coap_execute_to_mqtt({ok, changed}, Ref) ->
+    make_response(changed, Ref);
+coap_execute_to_mqtt({error, Error}, Ref) ->
+    make_response(Error, Ref).
+
+coap_discover_to_mqtt({ok, content}, CoapPayload, Ref) ->
+    Links = binary:split(CoapPayload, <<",">>),
+    make_response(content, Ref, <<"application/link-format">>, Links);
+coap_discover_to_mqtt({error, Error}, _CoapPayload, Ref) ->
+    make_response(Error, Ref).
+
+coap_writeattr_to_mqtt({ok, changed}, _CoapPayload, Ref) ->
+    make_response(changed, Ref);
+coap_writeattr_to_mqtt({error, Error}, _CoapPayload, Ref) ->
+    make_response(Error, Ref).
+
+coap_observe_to_mqtt({error, Error}, _CoapPayload, _Format, _ObserveSeqNum, Ref) ->
+    make_response(Error, Ref);
+coap_observe_to_mqtt({ok, content}, CoapPayload, Format, 0, Ref) ->
+    coap_read_to_mqtt({ok, content}, CoapPayload, Format, Ref);
+coap_observe_to_mqtt({ok, content}, CoapPayload, Format, ObserveSeqNum, Ref) ->
+    RefWithObserve = maps:put(<<"seqNum">>, ObserveSeqNum, Ref),
+    RefNotify = maps:put(<<"msgType">>, <<"notify">>, RefWithObserve),
+    coap_read_to_mqtt({ok, content}, CoapPayload, Format, RefNotify).
+
+coap_cancel_observe_to_mqtt({ok, content}, CoapPayload, Format, Ref) ->
+    coap_read_to_mqtt({ok, content}, CoapPayload, Format, Ref);
+coap_cancel_observe_to_mqtt({error, Error}, _CoapPayload, _Format, Ref) ->
+    make_response(Error, Ref).
+
+make_response(Code, Ref=#{}) ->
+    BaseRsp = make_base_response(Ref),
+    make_data_response(BaseRsp, Code).
+make_response(Code, Ref=#{}, _Format, Result) ->
+    BaseRsp = make_base_response(Ref),
+    make_data_response(BaseRsp, Code, _Format, Result).
+
+%% The base response format is what included in the request:
+%%
+%%   #{
+%%       <<"seqNum">> => SeqNum,
+%%       <<"requestID">> => maps:get(<<"requestID">>, Ref, null),
+%%       <<"cacheID">> => maps:get(<<"cacheID">>, Ref, null),
+%%       <<"msgType">> => maps:get(<<"msgType">>, Ref, null)
+%%   }
+
+make_base_response(Ref=#{}) ->
+    remove_tmp_fields(Ref).
+
+make_data_response(BaseRsp, Code) ->
+    BaseRsp#{
+        <<"data">> => #{
+            <<"reqPath">> => extract_path(BaseRsp),
+            <<"code">> => code(Code),
+            <<"codeMsg">> => Code
+        }
+    }.
+make_data_response(BaseRsp, Code, _Format, Result) ->
+    BaseRsp#{
+        <<"data">> =>  #{
+            <<"reqPath">> => extract_path(BaseRsp),
+            <<"code">> => code(Code),
+            <<"codeMsg">> => Code,
+            <<"content">> => Result
+        }
+    }.
+
+remove_tmp_fields(Ref) ->
+    maps:remove(observe_type, Ref).
+
+path_list(Path) ->
+    case binary:split(binary_util:trim(Path, $/), [<<$/>>], [global]) of
+        [ObjId, ObjInsId, ResId, ResInstId] -> [ObjId, ObjInsId, ResId, ResInstId];
+        [ObjId, ObjInsId, ResId] -> [ObjId, ObjInsId, ResId];
+        [ObjId, ObjInsId] -> [ObjId, ObjInsId];
+        [ObjId] -> [ObjId]
+    end.
+
+attr_query_list(Data) ->
+    attr_query_list(Data, valid_attr_keys(), []).
+attr_query_list(QueryJson = #{}, ValidAttrKeys, QueryList) ->
+    maps:fold(
+        fun
+            (_K, null, Acc) -> Acc;
+            (K, V, Acc) ->
+                case lists:member(K, ValidAttrKeys) of
+                    true ->
+                        KV = <<K/binary, "=", V/binary>>,
+                        Acc ++ [KV];
+                    false ->
+                        Acc
+                end
+        end, QueryList, QueryJson).
+
+valid_attr_keys() ->
+    [<<"pmin">>, <<"pmax">>, <<"gt">>, <<"lt">>, <<"st">>].
+
+data_format(Options) ->
+    proplists:get_value(content_format, Options, <<"text/plain">>).
+observe_seq(Options) ->
+    proplists:get_value(observe, Options, rand:uniform(1000000) + 1 ).
+
+add_alternate_path_prefix(<<"/">>, PathList) ->
+    PathList;
+add_alternate_path_prefix(AlternatePath, PathList) ->
+    [binary_util:trim(AlternatePath, $/) | PathList].
+
+extract_path(Ref = #{}) ->
+    case Ref of
+        #{<<"data">> := Data} ->
+            case maps:get(<<"path">>, Data, nil) of
+                nil -> maps:get(<<"basePath">>, Data, undefined);
+                Path -> Path
+            end;
+        #{<<"path">> := Path} ->
+            Path
+    end.
+
+batch_write_request(AlternatePath, BasePath, Content) ->
+    PathList = path_list(BasePath),
+    Method = case length(PathList) of
+                2 -> post;
+                3 -> put
+             end,
+    FullPathList = add_alternate_path_prefix(AlternatePath, PathList),
+    TlvData = emqx_lwm2m_message:json_to_tlv(PathList, Content),
+    Payload = emqx_lwm2m_tlv:encode(TlvData),
+    lwm2m_coap_message:request(con, Method, Payload, [{uri_path, FullPathList}, {content_format, <<"application/vnd.oma.lwm2m+tlv">>}]).
+
+single_write_request(AlternatePath, Data) ->
+    PathList = path_list(maps:get(<<"path">>, Data)),
+    FullPathList = add_alternate_path_prefix(AlternatePath, PathList),
+
+    TlvData = emqx_lwm2m_message:json_to_tlv(PathList, [Data]),
+    Payload = emqx_lwm2m_tlv:encode(TlvData),
+    lwm2m_coap_message:request(con, put, Payload, [{uri_path, FullPathList}, {content_format, <<"application/vnd.oma.lwm2m+tlv">>}]).
+
+
+code(get) -> <<"0.01">>;
+code(post) -> <<"0.02">>;
+code(put) -> <<"0.03">>;
+code(delete) -> <<"0.04">>;
+code(created) -> <<"2.01">>;
+code(deleted) -> <<"2.02">>;
+code(valid) -> <<"2.03">>;
+code(changed) -> <<"2.04">>;
+code(content) -> <<"2.05">>;
+code(continue) -> <<"2.31">>;
+code(bad_request) -> <<"4.00">>;
+code(uauthorized) -> <<"4.01">>;
+code(bad_option) -> <<"4.02">>;
+code(forbidden) -> <<"4.03">>;
+code(not_found) -> <<"4.04">>;
+code(method_not_allowed) -> <<"4.05">>;
+code(not_acceptable) -> <<"4.06">>;
+code(request_entity_incomplete) -> <<"4.08">>;
+code(precondition_failed) -> <<"4.12">>;
+code(request_entity_too_large) -> <<"4.13">>;
+code(unsupported_content_format) -> <<"4.15">>;
+code(internal_server_error) -> <<"5.00">>;
+code(not_implemented) -> <<"5.01">>;
+code(bad_gateway) -> <<"5.02">>;
+code(service_unavailable) -> <<"5.03">>;
+code(gateway_timeout) -> <<"5.04">>;
+code(proxying_not_supported) -> <<"5.05">>.

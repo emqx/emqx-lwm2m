@@ -1,8 +1,8 @@
 
 .PHONY: clean, clean_result, start_broker  stop_broker  case1 case2 case3
 
-
-EMQ    = emqx-rel/relx.config
+EMQX_DIR = emqx-enterprise-rel
+EMQ    = $(EMQX_DIR)/relx.config
 WAKAAMA  = build_wakaama/lightclient
 PAHO_PYTHON = paho/mqtt/client.py
 
@@ -15,16 +15,16 @@ clean_result:
 	-rm -f case*.txt
 	
 start_broker:
-	-rm -f emqx-rel/_rel/emqx/log/*
-	-emqx-rel/_rel/emqx/bin/emqx stop
+	-rm -f $(EMQX_DIR)/_rel/emqx/log/*
+	-$(EMQX_DIR)/_rel/emqx/bin/emqx stop
 	sleep 3
-	emqx-rel/_rel/emqx/bin/emqx start
+	$(EMQX_DIR)/_rel/emqx/bin/emqx start
 	sleep 1
-	emqx-rel/_rel/emqx/bin/emqx_ctl plugins load emqx_lwm2m
+	$(EMQX_DIR)/_rel/emqx/bin/emqx_ctl plugins load emqx_lwm2m
 
 
 stop_broker:
-	-emqx-rel/_rel/emqx/bin/emqx stop
+	-$(EMQX_DIR)/_rel/emqx/bin/emqx stop
 	
 
 case1:
@@ -44,7 +44,7 @@ case3:
 	
 	
 $(EMQ):
-	git clone https://github.com/emqx/emqx-rel.git
+	git clone https://github.com/emqx/emqx-enterprise-rel
 	git clone https://github.com/emqx/emqx-lwm2m.git
 	@echo "update emqx-lwm2m with this development code"
 	mv emqx-lwm2m  emqx_lwm2m
@@ -60,12 +60,12 @@ $(EMQ):
 	cp -rf ../src       emqx_lwm2m/
 	cp -rf ../Makefile  emqx_lwm2m/Makefile
 	cp -rf ../erlang.mk emqx_lwm2m/erlang.mk
-	-mkdir emqx-rel/deps
-	mv emqx_lwm2m  emqx-rel/deps/
+	-mkdir $(EMQX_DIR)/deps
+	mv emqx_lwm2m  $(EMQX_DIR)/deps/
 	@echo "start building ..."
 	python insert_lwm2m_plugin.py
 	make -C emqx-rel -f Makefile
-	-cp -rf ../lwm2m_xml  emqx-rel/_rel/emqx/etc/
+	-cp -rf ../lwm2m_xml  $(EMQX_DIR)/_rel/emqx/etc/
 
 
 w:
@@ -74,6 +74,8 @@ w:
 $(WAKAAMA):
 	git clone https://github.com/eclipse/wakaama
 	-mkdir build_wakaama
+	# replace lightclient's source code, change port from 5683 to 5783, since 5783 is the default port of emqx-lwm2m
+	cp -f object_security.c  wakaama/examples/lightclient/object_security.c
 	cd build_wakaama && cmake -DCMAKE_BUILD_TYPE=Debug ../wakaama/examples/lightclient && make
 	
 	
@@ -92,20 +94,21 @@ r: rebuild_emq
 	
 	
 rebuild_emq:
-	-emqx-rel/_rel/emqx/bin/emqx stop
-	-rm -rf emqx-rel/deps/emqx_lwm2m/etc
-	-rm -rf emqx-rel/deps/emqx_lwm2m/include
-	-rm -rf emqx-rel/deps/emqx_lwm2m/priv
-	-rm -rf emqx-rel/deps/emqx_lwm2m/src
-	-rm -rf emqx-rel/deps/emqx_lwm2m/Makefile
-	-rm -rf emqx-rel/deps/emqx_lwm2m/erlang.mk
-	cp -rf ../etc       emqx-rel/deps/emqx_lwm2m/
-	cp -rf ../include   emqx-rel/deps/emqx_lwm2m/
-	cp -rf ../priv      emqx-rel/deps/emqx_lwm2m/
-	cp -rf ../src       emqx-rel/deps/emqx_lwm2m/
-	cp -rf ../Makefile  emqx-rel/deps/emqx_lwm2m/Makefile
-	cp -rf ../erlang.mk emqx-rel/deps/emqx_lwm2m/erlang.mk
-	make -C emqx-rel -f Makefile
+	-$(EMQX_DIR)/_rel/emqx/bin/emqx stop
+	-mkdir $(EMQX_DIR)/deps
+	-rm -rf $(EMQX_DIR)/deps/emqx_lwm2m/etc
+	-rm -rf $(EMQX_DIR)/deps/emqx_lwm2m/include
+	-rm -rf $(EMQX_DIR)/deps/emqx_lwm2m/priv
+	-rm -rf $(EMQX_DIR)/deps/emqx_lwm2m/src
+	-rm -rf $(EMQX_DIR)/deps/emqx_lwm2m/Makefile
+	-rm -rf $(EMQX_DIR)/deps/emqx_lwm2m/erlang.mk
+	cp -rf ../etc       $(EMQX_DIR)/deps/emqx_lwm2m/
+	cp -rf ../include   $(EMQX_DIR)/deps/emqx_lwm2m/
+	cp -rf ../priv      $(EMQX_DIR)/deps/emqx_lwm2m/
+	cp -rf ../src       $(EMQX_DIR)/deps/emqx_lwm2m/
+	cp -rf ../Makefile  $(EMQX_DIR)/deps/emqx_lwm2m/Makefile
+	cp -rf ../erlang.mk $(EMQX_DIR)/deps/emqx_lwm2m/erlang.mk
+	make -C $(EMQX_DIR) -f Makefile
 	
 	
 clean: clean_result
@@ -117,7 +120,7 @@ clean: clean_result
 	
 	
 	
-lazy: clean_result start_broker case3 stop_broker
+lazy: clean_result start_broker case1 case2 case3 stop_broker
 	# custom your command here
 	@echo "you are so lazy"
 	
