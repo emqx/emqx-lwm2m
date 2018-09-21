@@ -6,12 +6,12 @@ NO_AUTOPATCH = cuttlefish
 
 DEPS = lager lwm2m_coap jsx clique
 dep_lager      = git https://github.com/erlang-lager/lager 3.6.5
-dep_lwm2m_coap = git https://github.com/emqx/lwm2m-coap china_telec
+dep_lwm2m_coap = git https://github.com/emqx/lwm2m-coap v0.2.0
 dep_jsx        = git https://github.com/talentdeficit/jsx v2.9.0
 dep_clique     = git https://github.com/emqtt/clique
 
 BUILD_DEPS = emqx cuttlefish
-dep_emqx = git https://github.com/emqx/emqx emqx30_shawn
+dep_emqx = git https://github.com/emqx/emqx emqx30
 dep_cuttlefish = git https://github.com/emqtt/cuttlefish emqx30
 
 TEST_DEPS = emqttc
