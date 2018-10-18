@@ -22,8 +22,6 @@
 
 -define(LOG(Level, Format, Args), lager:Level("LWM2M-JSON: " ++ Format, Args)).
 
--define(lixiang_decode(Value), base64:decode(Value)).
-
 tlv_to_json(BaseName, TlvData) ->
     DecodedTlv = emqx_lwm2m_tlv:parse(TlvData),
     ObjectId = object_id(BaseName),
@@ -157,7 +155,7 @@ json_to_tlv([_ObjectId], ResourceArray) ->
     element_loop_level2(ResourceArray, []).
 
 element_single_resource(ResourceId, [#{<<"type">> := Type, <<"value">> := Value}]) ->
-    BinaryValue = value_ex(Type, ?lixiang_decode(Value)),
+    BinaryValue = value_ex(Type, Value),
     [#{tlv_resource_with_value=>integer(ResourceId), value=>BinaryValue}].
 
 element_loop_level2([], Acc) ->
@@ -179,7 +177,7 @@ element_loop_level4([H|T], Acc) ->
     element_loop_level4(T, NewAcc).
 
 insert(Level, #{<<"path">> := EleName, <<"type">> := Type, <<"value">> := Value}, Acc) ->
-    BinaryValue = value_ex(Type, ?lixiang_decode(Value)),
+    BinaryValue = value_ex(Type, Value),
     Path = split_path(EleName),
     case Level of
         object          -> insert_resource_into_object(Path, BinaryValue, Acc);
@@ -344,7 +342,7 @@ integer(Int) when is_integer(Int) -> Int;
 integer(Bin) when is_binary(Bin) -> binary_to_integer(Bin).
 
 %% encode number to its binary representation
-encode_number(NumStr) ->
+encode_number(NumStr) when is_binary(NumStr) ->
     try
         Int = binary_to_integer(NumStr),
         encode_int(Int)
@@ -352,7 +350,11 @@ encode_number(NumStr) ->
         error:badarg ->
             Float = binary_to_float(NumStr),
             <<Float:64/float>>
-    end.
+    end;
+encode_number(Int) when is_integer(Int) ->
+    encode_int(Int);
+encode_number(Float) when is_float(Float) ->
+    <<Float:64/float>>.
 
 encode_int(Int) when Int >= 0 ->
     binary:encode_unsigned(Int);

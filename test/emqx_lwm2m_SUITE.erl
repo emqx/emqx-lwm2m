@@ -27,7 +27,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
 
--define(lixiang_encode(Value), base64:encode(Value)).
+-define(lixiang_encode(Value), (Value)).
 
 all() ->
     [

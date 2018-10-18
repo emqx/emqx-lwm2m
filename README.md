@@ -164,7 +164,14 @@ The MQTT message will be translated to an LwM2M DISCOVER command and sent to the
       - **If {?MsgType} = "create"**:
         ```json
         {
-            "path": "/{?ObjectID}"
+            "basePath": "/{?ObjectID}",
+            "content": [
+                {
+                    "path": {?ResourcePath},
+                    "type": {?ValueType},
+                    "value": {?Value}
+                }
+            ]
         }
         ```
         - {?ObjectID}: Integer, LwM2M Object ID
@@ -328,12 +335,16 @@ The MQTT message will be translated to an LwM2M DISCOVER command and sent to the
         "reqID": {?ReqID},
         "msgType": {?MsgType},
         "seqNum": {?ObserveSeqNum},
-        "content": [
-            "name": {?ResourceName},
-            "path": {?ResourcePath},
-            "type": {?ValueType},
-            "value": {?Value}
-        ]
+        "data": {
+            "code": {?StatusCode},
+            "codeMsg": {?CodeMsg},
+            "content": [
+                "name": {?ResourceName},
+                "path": {?ResourcePath},
+                "type": {?ValueType},
+                "value": {?Value}
+            ]
+        }
     }
     ```
     - {?MsgType}: String, must be "notify"

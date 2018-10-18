@@ -16,8 +16,6 @@
 
 -module(emqx_lwm2m_coap_resource).
 
--author("Feng Lee <feng@emqtt.io>").
-
 -include_lib("emqx/include/emqx.hrl").
 
 -include_lib("emqx/include/emqx_mqtt.hrl").
@@ -47,8 +45,7 @@
 
 -define(PREFIX, <<"rd">>).
 
--define(LOG(Level, Format, Args),
-    lager:Level("LWM2M-RESOURCE: " ++ Format, Args)).
+-define(LOG(Level, Format, Args), lager:Level("LWM2M-RESOURCE: " ++ Format, Args)).
 
 % resource operations
 coap_discover(_Prefix, _Args) ->
@@ -122,14 +119,14 @@ coap_response(ChId, Ref, CoapMsgType, CoapMsgMethod, CoapMsgPayload, CoapMsgOpts
                     CoapMsgOpts: ~p, Ref: ~p",
         [ChId, CoapMsgType, CoapMsgMethod, CoapMsgPayload, CoapMsgOpts, Ref]),
     MqttPayload = emqx_lwm2m_cmd_handler:coap2mqtt(CoapMsgMethod, CoapMsgPayload, CoapMsgOpts, Ref),
-    Lwm2mState2 = emqx_lwm2m_mqtt_adapter:send_ul_data(maps:get(<<"msgType">>, MqttPayload), MqttPayload, Lwm2mState),
+    Lwm2mState2 = emqx_lwm2m_protocol:send_ul_data(maps:get(<<"msgType">>, MqttPayload), MqttPayload, Lwm2mState),
     {noreply, Lwm2mState2}.
 
 coap_ack(_ChId, Ref, Lwm2mState) ->
     ?LOG(info, "~p, RCV CoAP Empty ACK, Ref: ~p", [_ChId, Ref]),
     AckRef = maps:put(<<"msgType">>, <<"ack">>, Ref),
     MqttPayload = emqx_lwm2m_cmd_handler:ack2mqtt(AckRef),
-    Lwm2mState2 = emqx_lwm2m_mqtt_adapter:send_ul_data(maps:get(<<"msgType">>, MqttPayload), MqttPayload, Lwm2mState),
+    Lwm2mState2 = emqx_lwm2m_protocol:send_ul_data(maps:get(<<"msgType">>, MqttPayload), MqttPayload, Lwm2mState),
     {ok, Lwm2mState2}.
 
 %% Batch dispatch
@@ -139,8 +136,8 @@ handle_info({dispatch, Topic, Msgs}, Lwm2mState) when is_list(Msgs) ->
                           end, Lwm2mState, Msgs)};
 %% Handle MQTT Message
 handle_info({dispatch, _Topic, MqttMsg}, Lwm2mState) ->
-    emqx_lwm2m_mqtt_adapter:deliver(MqttMsg, Lwm2mState),
-    {noreply, Lwm2mState};
+    Lwm2mState2 = emqx_lwm2m_protocol:deliver(MqttMsg, Lwm2mState),
+    {noreply, Lwm2mState2};
 
 %% Deliver Coap Message to Device
 handle_info({deliver_to_coap, CoapRequest, Ref}, Lwm2mState) ->
@@ -151,12 +148,12 @@ handle_info({'EXIT', _Pid, Reason}, Lwm2mState) ->
     {stop, Reason, Lwm2mState};
 
 handle_info(post_init, Lwm2mState) ->
-    emqx_lwm2m_mqtt_adapter:post_init(Lwm2mState),
-    {noreply, Lwm2mState};
+    Lwm2mState2 = emqx_lwm2m_protocol:post_init(Lwm2mState),
+    {noreply, Lwm2mState2};
 
 handle_info(auto_observe, Lwm2mState) ->
-    emqx_lwm2m_mqtt_adapter:auto_observe(Lwm2mState),
-    {noreply, Lwm2mState};
+    Lwm2mState2 = emqx_lwm2m_protocol:auto_observe(Lwm2mState),
+    {noreply, Lwm2mState2};
 
 handle_info({life_timer, expired}, Lwm2mState) ->
     ?LOG(debug, "lifetime expired, shutdown", []),
@@ -181,11 +178,11 @@ handle_info(Message, Lwm2mState) ->
 
 
 handle_call(info, _From, Lwm2mState) ->
-    {Info, Lwm2mState2} = emqx_lwm2m_mqtt_adapter:get_info(Lwm2mState),
+    {Info, Lwm2mState2} = emqx_lwm2m_protocol:get_info(Lwm2mState),
     {reply, Info, Lwm2mState2};
 
 handle_call(stats, _From, Lwm2mState) ->
-    {Stats, Lwm2mState2} = emqx_lwm2m_mqtt_adapter:get_stats(Lwm2mState),
+    {Stats, Lwm2mState2} = emqx_lwm2m_protocol:get_stats(Lwm2mState),
     {reply, Stats, Lwm2mState2};
 
 handle_call(kick, _From, Lwm2mState) ->
@@ -212,7 +209,7 @@ handle_cast(Msg, Lwm2mState) ->
     {noreply, Lwm2mState, hibernate}.
 
 terminate(Reason, Lwm2mState) ->
-    emqx_lwm2m_mqtt_adapter:terminate(Reason, Lwm2mState).
+    emqx_lwm2m_protocol:terminate(Reason, Lwm2mState).
 
 %%%%%%%%%%%%%%%%%%%%%%
 %% Internal Functions
@@ -242,7 +239,7 @@ process_update(ChId, LwM2MQuery, Location, LwM2MPayload, Lwm2mState) ->
     case get(lwm2m_context) of
         #lwm2m_context{location = LocationPath} ->
             RegInfo = append_object_list(LwM2MQuery, LwM2MPayload),
-            Lwm2mState2 = emqx_lwm2m_mqtt_adapter:update_reg_info(RegInfo, Lwm2mState),
+            Lwm2mState2 = emqx_lwm2m_protocol:update_reg_info(RegInfo, Lwm2mState),
             ?LOG(info, "~p, UPDATE Success, assgined location: ~p", [ChId, LocationPath]),
             {ok, changed, #coap_content{}, Lwm2mState2};
         undefined ->
@@ -255,7 +252,7 @@ process_update(ChId, LwM2MQuery, Location, LwM2MPayload, Lwm2mState) ->
 
 init_lwm2m_emq_client(ChId, LwM2MQuery = #{<<"ep">> := Epn}, LwM2MPayload, _Lwm2mState = undefined) ->
     RegInfo = append_object_list(LwM2MQuery, LwM2MPayload),
-    case emqx_lwm2m_mqtt_adapter:init(self(), Epn, ChId, RegInfo) of
+    case emqx_lwm2m_protocol:init(self(), Epn, ChId, RegInfo) of
         {ok, Lwm2mState} ->
             LocationPath = assign_location_path(Epn),
             ?LOG(info, "~p, REGISTER Success, assgined location: ~p", [ChId, LocationPath]),
@@ -269,7 +266,7 @@ init_lwm2m_emq_client(ChId, LwM2MQuery = #{<<"ep">> := Epn}, LwM2MPayload, Lwm2m
     RegInfo = append_object_list(LwM2MQuery, LwM2MPayload),
     LocationPath = assign_location_path(Epn),
     ?LOG(info, "~p, RE-REGISTER Success, location: ~p", [ChId, LocationPath]),
-    Lwm2mState2 = emqx_lwm2m_mqtt_adapter:replace_reg_info(RegInfo, Lwm2mState),
+    Lwm2mState2 = emqx_lwm2m_protocol:replace_reg_info(RegInfo, Lwm2mState),
     {ok, created, #coap_content{location_path = LocationPath}, Lwm2mState2}.
 
 append_object_list(LwM2MQuery, <<>>) when map_size(LwM2MQuery) == 0 -> #{};
@@ -382,5 +379,3 @@ assign_location_path(Epn) ->
     Location = [<<"rd">>, Epn],
     put(lwm2m_context, #lwm2m_context{epn = Epn, location = binary_util:join_path(Location)}),
     Location.
-
-% end of file

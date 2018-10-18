@@ -17,6 +17,7 @@
 -module(emqx_lwm2m_cmd_handler).
 
 -include("emqx_lwm2m.hrl").
+
 -include_lib("lwm2m_coap/include/coap.hrl").
 
 -export([mqtt2coap/2,
@@ -26,13 +27,16 @@
 
 -export([path_list/1]).
 
--define(STANDARD, 1).
-
--define(LOG(Level, Format, Args), lager:Level("LWM2M-CNVT: " ++ Format, Args)).
+-define(LOG(Level, Format, Args), lager:Level("LWM2M-CMD: " ++ Format, Args)).
 
 mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"create">>, <<"data">> := Data}) ->
-    FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
-    {lwm2m_coap_message:request(con, post, <<>>, [{uri_path, FullPathList}]), InputCmd};
+    PathList = path_list(maps:get(<<"basePath">>, Data, <<"/">>)),
+    FullPathList = add_alternate_path_prefix(AlternatePath, PathList),
+    TlvData = emqx_lwm2m_message:json_to_tlv(PathList, maps:get(<<"content">>, Data)),
+    Payload = emqx_lwm2m_tlv:encode(TlvData),
+    CoapRequest = lwm2m_coap_message:request(con, post, Payload, [{uri_path, FullPathList},
+                                                                  {content_format, <<"application/vnd.oma.lwm2m+tlv">>}]),
+    {CoapRequest, InputCmd};
 mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"delete">>, <<"data">> := Data}) ->
     FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
     {lwm2m_coap_message:request(con, delete, <<>>, [{uri_path, FullPathList}]), InputCmd};
