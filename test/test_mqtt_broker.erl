@@ -1,4 +1,5 @@
-%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
+%%--------------------------------------------------------------------
+%% Copyright (c) 2016-2017 EMQ Enterprise, Inc. (http://emqtt.io)
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -11,21 +12,23 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
+%%--------------------------------------------------------------------
 
 -module(test_mqtt_broker).
 
 -compile(export_all).
 
--behaviour(gen_server).
-
--define(LOGT(Format, Args), ct:print("TEST_BROKER: " ++ Format, Args)).
+-define(LOGT(Format, Args), lager:debug("TEST_BROKER: " ++ Format, Args)).
 
 -record(state, {subscriber}).
 
 -include_lib("emqx/include/emqx.hrl").
+
 -include_lib("emqx/include/emqx_mqtt.hrl").
--include_lib("emqx/include/emqx_macros.hrl").
+
 -include_lib("eunit/include/eunit.hrl").
+
+-import(proplists, [get_value/2, get_value/3]).
 
 start(_, <<"attacker">>, _, _, _) ->
     {stop, auth_failure};
@@ -36,24 +39,19 @@ start(ClientId, Username, Password, _Channel, KeepaliveInterval) ->
     self() ! {keepalive, start, KeepaliveInterval},
     {ok, []}.
 
-publish(Topic, Payload) ->
-    gen_server:call(?MODULE, {publish, {Topic, Payload}}).
-
-get_published_msg() ->
-    gen_server:call(?MODULE, get_published_msg).
+publish(Topic, Payload, Qos) ->
+    ClientId = <<"lwm2m_test_suite">>,
+    Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
+    emqx:publish(Msg).
 
 subscribe(Topic) ->
     gen_server:call(?MODULE, {subscribe, Topic, self()}).
 
-get_subscrbied_topics() ->
-    gen_server:call(?MODULE, get_subscribed_topics).
-
 unsubscribe(Topic) ->
     gen_server:call(?MODULE, {unsubscribe, Topic}).
 
-
-dispatch(Topic, Msg, MatchedTopicFilter) ->
-    gen_server:call(?MODULE, {dispatch, {Topic, Msg, MatchedTopicFilter}}).
+get_subscrbied_topics() ->
+    [Topic || {Client, Topic} <- ets:tab2list(emqx_subscription)].
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -63,18 +61,6 @@ stop() ->
 
 init(_Param) ->
     {ok, #state{subscriber = []}}.
-
-
-handle_call({publish, Msg = {Topic, Payload}}, _From, State) ->
-    ?LOGT("test broker publish ~p~n", [Msg]),
-    (is_binary(Topic) and is_binary(Payload)) orelse error("Topic and Payload should be binary"),
-    put(unittest_message, Msg),
-    {reply, {ok, []}, State};
-
-handle_call(get_published_msg, _From, State) ->
-    Response = get(unittest_message),
-    ?LOGT("test broker get published msg=~p~n", [Response]),
-    {reply, Response, State};
 
 handle_call({subscribe, Topic, Proc}, _From, State=#state{subscriber = SubList}) ->
     ?LOGT("test broker subscribe Topic=~p, Pid=~p~n", [Topic, Proc]),
@@ -93,13 +79,13 @@ handle_call({unsubscribe, Topic}, _From, State=#state{subscriber = SubList}) ->
     {reply, {ok, []}, State#state{subscriber = NewSubList}};
 
 
-handle_call({dispatch, {Topic, Msg, MatchedTopicFilter}}, _From, State=#state{subscriber = SubList}) ->
+handle_call({publish, {Topic, Msg, MatchedTopicFilter}}, _From, State=#state{subscriber = SubList}) ->
     (is_binary(Topic) and is_binary(Msg)) orelse error("Topic and Msg should be binary"),
     Pid = proplists:get_value(MatchedTopicFilter, SubList),
-    ?LOGT("test broker dispatch topic=~p, Msg=~p, Pid=~p, MatchedTopicFilter=~p, SubList=~p~n", [Topic, Msg, Pid, MatchedTopicFilter, SubList]),
+    ?LOGT("test broker publish topic=~p, Msg=~p, Pid=~p, MatchedTopicFilter=~p, SubList=~p~n", [Topic, Msg, Pid, MatchedTopicFilter, SubList]),
     (Pid == undefined) andalso ?LOGT("!!!!! this topic ~p has never been subscribed, please specify a valid topic filter", [MatchedTopicFilter]),
     ?assertNotEqual(undefined, Pid),
-    Pid ! {deliver, #mqtt_message{topic = Topic, payload = Msg}},
+    Pid ! {deliver, #message{topic = Topic, payload = Msg}},
     {reply, ok, State};
 
 handle_call(stop, _From, State) ->
@@ -181,3 +167,6 @@ cancel(TRef) ->
 timer(Sec, Msg) ->
     erlang:send_after(timer:seconds(Sec), self(), Msg).
 
+
+log(Format, Args) ->
+    lager:debug(Format, Args).

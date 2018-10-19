@@ -1,4 +1,5 @@
-%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
+%%--------------------------------------------------------------------
+%% Copyright (c) 2016-2017 EMQ Enterprise, Inc. (http://emqtt.io)
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -11,14 +12,17 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
+%%--------------------------------------------------------------------
 
 -module(emqx_lwm2m_tlv).
 
--include("emqx_lwm2m.hrl").
+-author("Feng Lee <feng@emqtt.io>").
 
 -export([parse/1, encode/1]).
 
--define(LOG(Level, Format, Args), emqx_logger:Level("LWM2M-TLV: " ++ Format, Args)).
+-include("emqx_lwm2m.hrl").
+
+-define(LOG(Level, Format, Args), lager:Level("LWM2M-TLV: " ++ Format, Args)).
 
 -define(TLV_TYPE_OBJECT_INSTANCE,     0).
 -define(TLV_TYPE_RESOURCE_INSTANCE,   1).
@@ -29,6 +33,8 @@
 -define(TLV_LEGNTH_8_BIT,    1).
 -define(TLV_LEGNTH_16_BIT,   2).
 -define(TLV_LEGNTH_24_BIT,   3).
+
+
 
 %----------------------------------------------------------------------------------------------------------------------------------------
 % [#{tlv_object_instance := Id11, value := Value11}, #{tlv_object_instance := Id12, value := Value12}, ...]
