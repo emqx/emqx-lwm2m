@@ -27,7 +27,7 @@
 
 -export([path_list/1]).
 
--define(LOG(Level, Format, Args), lager:Level("LWM2M-CMD: " ++ Format, Args)).
+-define(LOG(Level, Format, Args), logger:Level("LWM2M-CMD: " ++ Format, Args)).
 
 mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"create">>, <<"data">> := Data}) ->
     PathList = path_list(maps:get(<<"basePath">>, Data, <<"/">>)),

@@ -20,7 +20,7 @@
 
 -define(PORT, 5683).
 
--define(LOGT(Format, Args), lager:debug("TEST_SUITE: " ++ Format, Args)).
+-define(LOGT(Format, Args), logger:debug("TEST_SUITE: " ++ Format, Args)).
 
 -include("emqx_lwm2m.hrl").
 -include_lib("lwm2m_coap/include/coap.hrl").

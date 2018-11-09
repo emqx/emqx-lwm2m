@@ -48,7 +48,7 @@
 
 -define(DEFAULT_KEEP_ALIVE_DURATION,  60*2).
 
--define(LOG(Level, Format, Args), lager:Level("LWM2M-PROTO: " ++ Format, Args)).
+-define(LOG(Level, Format, Args), logger:Level("LWM2M-PROTO: " ++ Format, Args)).
 
 %%--------------------------------------------------------------------
 %% APIs

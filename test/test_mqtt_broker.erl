@@ -18,7 +18,7 @@
 
 -compile(export_all).
 
--define(LOGT(Format, Args), lager:debug("TEST_BROKER: " ++ Format, Args)).
+-define(LOGT(Format, Args), logger:debug("TEST_BROKER: " ++ Format, Args)).
 
 -record(state, {subscriber}).
 
@@ -169,4 +169,4 @@ timer(Sec, Msg) ->
 
 
 log(Format, Args) ->
-    lager:debug(Format, Args).
+    logger:debug(Format, Args).

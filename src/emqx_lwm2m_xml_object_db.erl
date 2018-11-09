@@ -32,7 +32,7 @@
     terminate/2, code_change/3]).
 
 -define(LOG(Level, Format, Args),
-    lager:Level("LWM2M-OBJ-DB: " ++ Format, Args)).
+    logger:Level("LWM2M-OBJ-DB: " ++ Format, Args)).
 
 -define(LWM2M_OBJECT_DEF_TAB, lwm2m_object_def_tab).
 -define(LWM2M_OBJECT_NAME_TO_ID_TAB, lwm2m_object_name_to_id_tab).

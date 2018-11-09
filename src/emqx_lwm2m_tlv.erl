@@ -22,7 +22,7 @@
 
 -include("emqx_lwm2m.hrl").
 
--define(LOG(Level, Format, Args), lager:Level("LWM2M-TLV: " ++ Format, Args)).
+-define(LOG(Level, Format, Args), logger:Level("LWM2M-TLV: " ++ Format, Args)).
 
 -define(TLV_TYPE_OBJECT_INSTANCE,     0).
 -define(TLV_TYPE_RESOURCE_INSTANCE,   1).
