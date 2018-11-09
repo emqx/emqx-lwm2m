@@ -45,7 +45,7 @@
 
 -define(PREFIX, <<"rd">>).
 
--define(LOG(Level, Format, Args), lager:Level("LWM2M-RESOURCE: " ++ Format, Args)).
+-define(LOG(Level, Format, Args), logger:Level("LWM2M-RESOURCE: " ++ Format, Args)).
 
 % resource operations
 coap_discover(_Prefix, _Args) ->

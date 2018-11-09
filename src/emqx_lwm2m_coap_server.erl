@@ -23,7 +23,7 @@
 -export([start/0, start/1, stop/0]).
 
 -define(LOG(Level, Format, Args),
-    lager:Level("LWM2M: " ++ Format, Args)).
+    logger:Level("LWM2M: " ++ Format, Args)).
 
 
 start() ->

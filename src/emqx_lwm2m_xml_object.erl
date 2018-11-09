@@ -28,7 +28,7 @@
          get_resource_name/2]).
 
 -define(LOG(Level, Format, Args),
-    lager:Level("LWM2M-OBJ: " ++ Format, Args)).
+    logger:Level("LWM2M-OBJ: " ++ Format, Args)).
 
 % This module is for future use. Disabled now.
 

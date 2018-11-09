@@ -25,7 +25,7 @@
 -record(timer_state, {interval, tref, message}).
 
 -define(LOG(Level, Format, Args),
-    lager:Level("LWM2M-TIMER: " ++ Format, Args)).
+    logger:Level("LWM2M-TIMER: " ++ Format, Args)).
 
 cancel_timer(#timer_state{tref = TRef}) when is_reference(TRef) ->
     erlang:cancel_timer(TRef), ok.
