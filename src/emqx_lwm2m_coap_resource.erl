@@ -59,12 +59,10 @@ coap_post(ChId, [?LWM2M_REGISTER_PREFIX], [], Query, Content) ->
     #lwm2m_query{epn = Epn, lwm2m_ver = Ver, life_time = LifeTime} = parse_query(Query),
     case (check_epn(Epn) andalso check_lifetime(LifeTime) andalso check_lwm2m_version(Ver)) of
         true ->
-            Location = list_to_binary(io_lib:format("~.16B", [random:uniform(65535)])),
-            ?LOG(debug, "~p ~p REGISTER command Query=~p, Content=~p, Location=~p", [self(), ChId, Query, Content, Location]),
-            put(lwm2m_context, #lwm2m_context{epn = Epn, location = Location}),
-            % TODO: parse content
+            LocationPath = assign_location_path(Epn),
+            ?LOG(debug, "~p ~p REGISTER command Query=~p, Content=~p, Location=~p", [self(), ChId, Query, Content, LocationPath]),
             emqx_lwm2m_mqtt_adapter:start_link(self(), Epn, ChId, LifeTime),
-            {ok, created, #coap_content{payload = list_to_binary(io_lib:format("/rd/~s", [Location]))}};
+            {ok, created, #coap_content{location_path = LocationPath}};
         false ->
             ?LOG(error, "refuse REGISTER from ~p due to wrong parameters, epn=~p, lifetime=~p, lwm2m_ver=~p", [ChId, Epn, LifeTime, Ver]),
             quit(ChId),
@@ -74,16 +72,18 @@ coap_post(ChId, [?LWM2M_REGISTER_PREFIX], [], Query, Content) ->
 
 % LWM2M UPDATE COMMAND
 coap_post(ChId, [?LWM2M_REGISTER_PREFIX], [Location], Query, Content) ->
+    LocationPath = binary_util:join_path([<<"rd">>, Location]),
+
     #lwm2m_query{life_time = LifeTime} = parse_query(Query),
     #lwm2m_context{location = TrueLocation} = get(lwm2m_context),
-    ?LOG(debug, "~p ~p UPDATE command location=~p, LifeTime=~p, Query=~p, Content=~p", [self(), ChId, Location, LifeTime, Query, Content]),
+    ?LOG(debug, "~p ~p UPDATE command location=~p, LifeTime=~p, Query=~p, Content=~p", [self(), ChId, LocationPath, LifeTime, Query, Content]),
     % TODO: parse content
-    case Location of
+    case LocationPath of
         TrueLocation ->
             emqx_lwm2m_mqtt_adapter:new_keepalive_interval(ChId, LifeTime),
             {ok, changed, #coap_content{}};
         _Other       ->
-            ?LOG(error, "Location mismatch ~p vs ~p", [Location, TrueLocation]),
+            ?LOG(error, "Location mismatch ~p vs ~p", [LocationPath, TrueLocation]),
             {error, bad_request}
     end;
 coap_post(ChId, Prefix, Name, Query, Content) ->
@@ -96,14 +96,15 @@ coap_put(_ChId, Prefix, Name, Query, Content) ->
 
 % LWM2M DE-REGISTER COMMAND
 coap_delete(ChId, [?LWM2M_REGISTER_PREFIX], [Location]) ->
+    LocationPath = binary_util:join_path([<<"rd">>, Location]),
     #lwm2m_context{location = TrueLocation} = get(lwm2m_context),
-    ?LOG(debug, "~p ~p DELETE command location=~p", [self(), ChId, Location]),
-    case Location of
+    ?LOG(debug, "~p ~p DELETE command location=~p", [self(), ChId, LocationPath]),
+    case LocationPath of
         TrueLocation ->
             emqx_lwm2m_mqtt_adapter:stop(ChId),
             quit(ChId);
         _Other ->
-            ?LOG(error, "ignore DE-REGISTER command due to mismatch location ~p vs ~p", [Location, TrueLocation]),
+            ?LOG(error, "ignore DE-REGISTER command due to mismatch location ~p vs ~p", [LocationPath, TrueLocation]),
             ignore
     end,
     ok;
@@ -180,6 +181,13 @@ check_lifetime(_)         -> true.
 quit(ChId) ->
     self() !{coap_error, ChId, undefined, [], shutdown}.
 
+
+assign_location_path(Epn) ->
+    %Location = list_to_binary(io_lib:format("~.16B", [rand:uniform(65535)])),
+    %LocationPath = <<"/rd/", Location/binary>>,
+    Location = [<<"rd">>, Epn],
+    put(lwm2m_context, #lwm2m_context{epn = Epn, location = binary_util:join_path(Location)}),
+    Location.
 
 % end of file
 
