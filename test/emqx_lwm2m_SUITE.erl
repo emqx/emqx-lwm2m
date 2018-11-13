@@ -18,7 +18,7 @@
 
 -compile(export_all).
 
--define(PORT, 5783).
+-define(PORT, 5683).
 
 -define(LOGT(Format, Args), lager:debug("TEST_SUITE: " ++ Format, Args)).
 

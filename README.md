@@ -27,7 +27,7 @@ git clone https://github.com/eclipse/wakaama
 Modify wakaama/examples/lightclient/object_security.c, replace uri with appropriate value:
 
 ```
-targetP->uri = strdup("coap://localhost:5783");
+targetP->uri = strdup("coap://localhost:5683");
 ```
 
 Compile wakaama:
@@ -66,7 +66,7 @@ Configure Plugin
 File: etc/emqx_lwm2m.conf
 
 ```
-lwm2m.port = 5783
+lwm2m.port = 5683
 lwm2m.certfile = etc/certs/cert.pem
 lwm2m.keyfile = etc/certs/key.pem
 lwm2m.xml_dir =  etc/lwm2m_xml
