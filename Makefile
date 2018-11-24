@@ -5,18 +5,23 @@ PROJECT_VERSION = 3.0
 NO_AUTOPATCH = cuttlefish
 
 DEPS = lwm2m_coap jsx clique
-dep_lwm2m_coap = git https://github.com/emqx/lwm2m-coap v1.0.0
-dep_jsx        = git https://github.com/talentdeficit/jsx v2.9.0
-dep_clique     = git https://github.com/emqx/clique
+dep_lwm2m_coap = git-emqx https://github.com/emqx/lwm2m-coap v1.0.0
+dep_jsx        = git-emqx https://github.com/talentdeficit/jsx v2.9.0
+dep_clique     = git-emqx https://github.com/emqx/clique develop
 
 BUILD_DEPS = emqx cuttlefish
 dep_emqx = git https://github.com/emqx/emqx emqx30
 dep_cuttlefish = git https://github.com/emqx/cuttlefish emqx30
 
 TEST_DEPS = emqttc
-dep_emqttc = git https://github.com/emqtt/emqttc
+dep_emqttc = git https://github.com/emqtt/emqttc master
 
 ERLC_OPTS += +debug_info
+
+define dep_fetch_git-emqx
+	git clone -q --depth 1 -b $(call dep_commit,$(1)) -- $(call dep_repo,$(1)) $(DEPS_DIR)/$(call dep_name,$(1)) > /dev/null 2>&1; \
+	cd $(DEPS_DIR)/$(call dep_name,$(1));
+endef
 
 include erlang.mk
 
