@@ -10,11 +10,11 @@ dep_jsx        = git-emqx https://github.com/talentdeficit/jsx v2.9.0
 dep_clique     = git-emqx https://github.com/emqx/clique develop
 
 BUILD_DEPS = emqx cuttlefish
-dep_emqx = git https://github.com/emqx/emqx emqx30
-dep_cuttlefish = git https://github.com/emqx/cuttlefish emqx30
+dep_emqx = git-emqx https://github.com/emqx/emqx emqx30
+dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish emqx30
 
 TEST_DEPS = emqttc
-dep_emqttc = git https://github.com/emqtt/emqttc master
+dep_emqttc = git-emqx https://github.com/emqtt/emqttc master
 
 ERLC_OPTS += +debug_info
 
