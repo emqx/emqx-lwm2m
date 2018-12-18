@@ -16,7 +16,7 @@
 
 -module(emqx_lwm2m_json).
 
--author("Feng Lee <feng@emqtt.io>").
+-author("Feng Lee <feng@emqx.io>").
 
 -export([tlv_to_json/2, json_to_tlv/2, text_to_json/2, opaque_to_json/2]).
 

@@ -16,7 +16,7 @@
 
 -module(emqx_lwm2m_registry).
 
--author("Feng Lee <feng@emqtt.io>").
+-author("Feng Lee <feng@emqx.io>").
 
 -include("emqx_lwm2m.hrl").
 

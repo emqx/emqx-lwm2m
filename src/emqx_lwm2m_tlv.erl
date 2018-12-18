@@ -16,7 +16,7 @@
 
 -module(emqx_lwm2m_tlv).
 
--author("Feng Lee <feng@emqtt.io>").
+-author("Feng Lee <feng@emqx.io>").
 
 -export([parse/1, encode/1]).
 

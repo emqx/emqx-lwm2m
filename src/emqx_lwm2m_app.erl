@@ -16,7 +16,7 @@
 
 -module(emqx_lwm2m_app).
 
--author("Feng Lee <feng@emqtt.io>").
+-author("Feng Lee <feng@emqx.io>").
 
 -behaviour(application).
 -export([start/2, stop/1, prep_stop/1]).

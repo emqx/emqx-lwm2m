@@ -16,7 +16,7 @@
 
 -module(emqx_lwm2m_xml_object).
 
--author("Feng Lee <feng@emqtt.io>").
+-author("Feng Lee <feng@emqx.io>").
 
 -include("emqx_lwm2m.hrl").
 -include_lib("xmerl/include/xmerl.hrl").
