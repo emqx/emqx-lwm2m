@@ -346,9 +346,10 @@ auto_observe(AlternatePath, ObjectList, CoapPid, Proto) ->
         end).
 
 observe_object_list(AlternatePath, ObjectList, CoapPid, Proto) ->
+    ObjListHuawei = [<<"/19/0/0">>],
     lists:foreach(fun(ObjectPath) ->
         observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, 100)
-    end, ObjectList).
+    end, ObjListHuawei).
 
 observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, Interval) ->
     observe_object(AlternatePath, ObjectPath, CoapPid, Proto),
@@ -367,7 +368,8 @@ observe_object(AlternatePath, ObjectPath, CoapPid, Proto) ->
 
 auto_discover(AlternatePath, ObjectList, CoapPid, Proto) ->
     erlang:spawn(fun() ->
-            discover_object_list(AlternatePath, ObjectList, CoapPid, Proto)
+            %discover_object_list(AlternatePath, ObjectList, CoapPid, Proto)
+            ok
         end).
 
 discover_object_list(AlternatePath, ObjectList, CoapPid, Proto) ->
