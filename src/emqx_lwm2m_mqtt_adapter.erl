@@ -29,7 +29,7 @@
 -include_lib("emqx/include/emqx_internal.hrl").
 
 %% API.
--export([start_link/4, send_ul_data/3, update_reg_info/2, replace_reg_info/2]).
+-export([start_link/4, send_ul_data/4, update_reg_info/2, replace_reg_info/2]).
 -export([stop/1]).
 
 %% gen_server.
@@ -67,9 +67,9 @@ update_reg_info(ChId, RegInfo) ->
 replace_reg_info(ChId, RegInfo) ->
     gen_server:cast({via, emqx_lwm2m_registry, ChId}, {replace_reg_info, RegInfo}).
 
-send_ul_data(_ChId, _EventType, <<>>) -> ok;
-send_ul_data(ChId, EventType, Payload) ->
-    gen_server:cast({via, emqx_lwm2m_registry, ChId}, {send_ul_data, EventType, Payload}).
+send_ul_data(_ChId, _EventType, <<>>, BasePath) -> ok;
+send_ul_data(ChId, EventType, Payload, BasePath) ->
+    gen_server:cast({via, emqx_lwm2m_registry, ChId}, {send_ul_data, EventType, Payload, BasePath}).
 
 %%--------------------------------------------------------------------
 %% gen_server Callbacks
@@ -118,8 +118,8 @@ handle_call(Request, _From, State) ->
     ?LOG(error, "adapter unexpected call ~p", [Request]),
     {reply, ignored, State, hibernate}.
 
-handle_cast({send_ul_data, EventType, Payload}, State=#state{proto = Proto, coap_pid = CoapPid}) ->
-    NewProto = send_data(EventType, Payload, Proto),
+handle_cast({send_ul_data, EventType, Payload, BasePath}, State=#state{proto = Proto, coap_pid = CoapPid}) ->
+    NewProto = send_data(EventType, Payload, Proto, BasePath),
     flush_cached_downlink_messages(CoapPid),
     {noreply, State#state{proto = NewProto}};
 
@@ -339,13 +339,13 @@ default_uplink_topic(<<"notify">>, ClientID) ->
 default_uplink_topic(Type, ClientID) when is_binary(Type) ->
     {<<"lwm2m/", ClientID/binary, "/up/dm">>, 0}.
 
-send_data(EventType, Payload = #{}, Proto) ->
-    do_send_data(EventType, Payload, Proto).
+send_data(EventType, Payload = #{}, Proto, BasePath) ->
+    do_send_data(EventType, Payload, Proto, BasePath).
 
-do_send_data(EventType, Payload, Proto) ->
+do_send_data(EventType, Payload, Proto, BasePath) ->
     NewPayload = maps:put(<<"msgType">>, EventType, Payload),
     {Topic, Qos} = uplink_topic(EventType, Proto),
-    proto_publish(Topic, jsx:encode(NewPayload), Qos, Proto).
+    proto_publish(<<Topic/binary, BasePath/binary>>, jsx:encode(NewPayload), Qos, Proto).
 
 auto_observe(AlternatePath, ObjectList, CoapPid, Proto) ->
     erlang:spawn(fun() ->

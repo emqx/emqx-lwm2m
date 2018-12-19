@@ -23,6 +23,8 @@
 
 -export([mqtt_payload_to_coap_request/2, coap_response_to_mqtt_payload/4]).
 
+-export([extract_path/1]).
+
 -define(LOG(Level, Format, Args), lager:Level("LWM2M-CNVT: " ++ Format, Args)).
 
 mqtt_payload_to_coap_request(AlternatePath, InputCmd = #{<<"msgType">> := <<"read">>, <<"data">> := Data}) ->
