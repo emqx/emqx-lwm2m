@@ -116,14 +116,15 @@ handle_info({coap_response, ChId, _Channel, Ref = #{<<"msgType">> := MsgType}, M
     ?LOG(info, "Received CoAP response from device: ~p, ref: ~p", [Msg, Ref]),
     MqttPayload = emqx_lwm2m_cmd_handler:coap_response_to_mqtt_payload(Method, CoapResponse, Options, Ref),
 
+    BasePath = emqx_lwm2m_cmd_handler:extract_path(Ref),
     if
         %% If it is a lwm2m notify, not a piggybacked ack, we shall change the
         %%   msgType to "notify"
         (MsgType =:= <<"observe">> orelse MsgType =:= <<"cancel-observe">>) andalso (Type =/= ack) ->
             PayloadNotify = maps:put(<<"msgType">>, <<"notify">>, MqttPayload),
-            emqx_lwm2m_mqtt_adapter:send_ul_data(ChId, <<"notify">>, PayloadNotify);
+            emqx_lwm2m_mqtt_adapter:send_ul_data(ChId, <<"notify">>, PayloadNotify, BasePath);
         true ->
-            emqx_lwm2m_mqtt_adapter:send_ul_data(ChId, MsgType, MqttPayload)
+            emqx_lwm2m_mqtt_adapter:send_ul_data(ChId, MsgType, MqttPayload, BasePath)
     end,
     {noreply, ObState};
 
