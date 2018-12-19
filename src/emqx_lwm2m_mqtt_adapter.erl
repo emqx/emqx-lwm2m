@@ -148,6 +148,13 @@ handle_cast({replace_reg_info, NewRegInfo}, State=#state{reg_info = RegInfo, lif
     flush_cached_downlink_messages(CoapPid),
 
     #{<<"alternatePath">> := AlternatePath} = RegInfo,
+    %% - auto observe the objects, for demo only
+    case proplists:get_value(lwm2m_auto_observe, Proto#proto_state.headers, false) of
+        true ->
+            auto_observe(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto);
+        _ -> ok
+    end,
+
     auto_discover(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto),
     
     {noreply, State#state{life_timer = UpdatedLifeTimer, reg_info = NewRegInfo, proto = Proto}, hibernate};
