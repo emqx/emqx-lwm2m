@@ -108,7 +108,6 @@ groups() ->
 
 init_per_suite(Config) ->
     run_setup_steps(emqx),
-    lager_common_test_backend:bounce(debug),
     Config.
 
 end_per_suite(Config) ->
