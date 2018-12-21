@@ -169,14 +169,14 @@ do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
     unsubscribe(CoapPid, SubTopic, Lwm2mState#lwm2m_state.endpoint_name),
     emqx_hooks:run('client.disconnected', [credentials(Lwm2mState), Error]).
 
-subscribe(CoapPid, Topic, Qos, EndpointName) ->
+subscribe(_CoapPid, Topic, Qos, EndpointName) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => Qos, first => true},
-    emqx_broker:subscribe(Topic, CoapPid, undefined, Opts),
+    emqx_broker:subscribe(Topic, Opts),
     emqx_hooks:run('session.subscribed', [#{client_id => EndpointName}, Topic, Opts]).
 
-unsubscribe(CoapPid, Topic, EndpointName) ->
+unsubscribe(_CoapPid, Topic, EndpointName) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => 0},
-    emqx_broker:unsubscribe(Topic, CoapPid),
+    emqx_broker:unsubscribe(Topic),
     emqx_hooks:run('session.unsubscribed', [#{client_id => EndpointName}, Topic, Opts]).
 
 publish(Topic, Payload, Qos, EndpointName) ->
