@@ -7,11 +7,11 @@ NO_AUTOPATCH = cuttlefish
 DEPS = lwm2m_coap jsx clique
 dep_lwm2m_coap = git-emqx https://github.com/emqx/lwm2m-coap v1.0.0
 dep_jsx        = git-emqx https://github.com/talentdeficit/jsx v2.9.0
-dep_clique     = git-emqx https://github.com/emqx/clique develop
+dep_clique     = git-emqx https://github.com/emqx/clique v0.3.11
 
 BUILD_DEPS = emqx cuttlefish
 dep_emqx = git-emqx https://github.com/emqx/emqx emqx30
-dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish emqx30
+dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish v2.2.0
 
 TEST_DEPS = emqttc
 dep_emqttc = git-emqx https://github.com/emqtt/emqttc master
