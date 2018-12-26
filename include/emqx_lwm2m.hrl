@@ -16,12 +16,13 @@
 
 -define(APP, emqx_lwm2m).
 
-
 -record(coap_mqtt_auth, {clientid, username, password}).
+-record(lwm2m_context, {epn, location}).
 
+-define(OMA_ALTER_PATH_RT, <<"\"oma.lwm2m\"">>).
 
 -define(MQ_COMMAND_ID,         <<"CmdID">>).
--define(MQ_COMMAND,            <<"Command">>).
+-define(MQ_COMMAND,            <<"requestID">>).
 -define(MQ_BASENAME,           <<"BaseName">>).
 -define(MQ_ARGS,               <<"Arguments">>).
 
@@ -43,7 +44,3 @@
 -define(LWM2M_FORMAT_OPAQUE,     42).
 -define(LWM2M_FORMAT_TLV,        11542).
 -define(LWMWM_FORMAT_JSON,       11543).
-
-
-
-

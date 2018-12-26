@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2016-2017 EMQ Enterprise, Inc. (http://emqtt.io)
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,7 +11,7 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
+
 -module(emqx_lwm2m_xml_object_db).
 
 -author("Feng Lee <feng@emqtt.io>").
@@ -32,7 +31,7 @@
     terminate/2, code_change/3]).
 
 -define(LOG(Level, Format, Args),
-    lager:Level("LWM2M-OBJ-DB: " ++ Format, Args)).
+    logger:Level("LWM2M-OBJ-DB: " ++ Format, Args)).
 
 -define(LWM2M_OBJECT_DEF_TAB, lwm2m_object_def_tab).
 -define(LWM2M_OBJECT_NAME_TO_ID_TAB, lwm2m_object_name_to_id_tab).

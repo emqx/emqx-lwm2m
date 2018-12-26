@@ -1,7 +1,80 @@
 {mapping, "lwm2m.port", "emqx_lwm2m.port", [
-  {datatype, integer}
+  {datatype, integer},
+  {default, 5683}
 ]}.
 
+%% defaults to 0
+{mapping, "lwm2m.lifetime_min", "emqx_lwm2m.lifetime_min", [
+  {datatype, integer},
+  {default, 0}
+]}.
+
+%% defaults to 10 years
+{mapping, "lwm2m.lifetime_max", "emqx_lwm2m.lifetime_max", [
+  {datatype, integer},
+  {default, 315360000}
+]}.
+
+{mapping, "lwm2m.qmode_time_window", "emqx_lwm2m.qmode_time_window", [
+  {datatype, integer},
+  {default, 0}
+]}.
+
+{mapping, "lwm2m.auto_observe", "emqx_lwm2m.auto_observe", [
+  {datatype, flag},
+  {default, off}
+]}.
+
+{mapping, "lwm2m.lb", "emqx_lwm2m.options", [
+  {datatype, atom},
+  {default, undefined}
+]}.
+
+{mapping, "lwm2m.opts.$name", "emqx_lwm2m.options", [
+  {datatype, bytesize}
+]}.
+
+{translation, "emqx_lwm2m.options", fun(Conf) ->
+  Options = cuttlefish_variable:filter_by_prefix("lwm2m.opts", Conf),
+  Opts = lists:map(fun({[_,_, Key], Value}) ->
+    {list_to_atom(Key), Value}
+  end, Options),
+  LB = cuttlefish:conf_get("lwm2m.lb", Conf, undefined),
+  [{lb, LB}, {opts, Opts}]
+end}.
+
+{mapping, "lwm2m.topics.command", "emqx_lwm2m.topics", [
+  {datatype, string},
+  {default, "lwm2m/%e/dn/#"}
+]}.
+
+{mapping, "lwm2m.topics.response", "emqx_lwm2m.topics", [
+  {datatype, string},
+  {default, "lwm2m/%e/up/resp"}
+]}.
+
+{mapping, "lwm2m.topics.notify", "emqx_lwm2m.topics", [
+  {datatype, string},
+  {default, "lwm2m/%e/up/notify"}
+]}.
+
+{mapping, "lwm2m.topics.register", "emqx_lwm2m.topics", [
+  {datatype, string},
+  {default, "lwm2m/%e/up/resp"}
+]}.
+
+{mapping, "lwm2m.topics.update", "emqx_lwm2m.topics", [
+  {datatype, string},
+  {default, "lwm2m/%e/up/resp"}
+]}.
+
+{translation, "emqx_lwm2m.topics", fun(Conf) ->
+  Topics = cuttlefish_variable:filter_by_prefix("lwm2m.topics", Conf),
+  Opts = lists:map(fun({[_,_, Key], Value}) ->
+              {list_to_atom(Key), Value}
+            end, Topics),
+  Opts
+end}.
 
 {mapping, "lwm2m.keyfile", "emqx_lwm2m.keyfile", [
   {datatype, string}
@@ -14,5 +87,3 @@
 {mapping, "lwm2m.xml_dir", "emqx_lwm2m.xml_dir", [
   {datatype, string}
 ]}.
-
-
