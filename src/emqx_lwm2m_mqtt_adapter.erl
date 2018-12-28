@@ -164,11 +164,13 @@ handle_cast(Msg, State) ->
     {noreply, State, hibernate}.
 
 handle_info({deliver, Msg = #mqtt_message{topic = TopicName, payload = Payload}},
-             State = #state{proto = Proto, coap_pid = CoapPid, reg_info = RegInfo}) ->
+             State = #state{proto = Proto = #proto_state{headers = Headers},
+                            coap_pid = CoapPid, reg_info = RegInfo}) ->
     %% handle PUBLISH from broker
     ?LOG(debug, "Get MQTT message from broker, Topic: ~p, Payload: ~p", [TopicName, Payload]),
     #{<<"alternatePath">> := AlternatePath} = RegInfo,
-    deliver_to_coap(AlternatePath, Payload, CoapPid, Proto, is_cache_mode(RegInfo)),
+    deliver_to_coap(AlternatePath, Payload, CoapPid, Proto,
+                    is_cache_mode(RegInfo, proplists:get_value(lwm2m_model, Headers, drx))),
 
     NewProto = proto_deliver_ack(Msg, Proto),
     {noreply, State#state{proto = NewProto}};
@@ -429,16 +431,18 @@ do_deliver_to_coap(CoapPid, CoapRequest, Ref) ->
     ?LOG(debug, "Deliver To CoAP(~p), CoapRequest: ~p, Ref: ~p", [CoapPid, CoapRequest, Ref]),
     CoapPid ! {dispatch_command, CoapRequest, Ref}.
 
-is_cache_mode(#{<<"apn">> := APN})
+is_cache_mode(_RegInfo, psm)
+    -> true;
+is_cache_mode(#{<<"apn">> := APN}, _)
     when
         APN =:= <<"psmA.eDRX0.ctnb">>;
         APN =:= <<"psmC.eDRX0.ctnb">>;
         APN =:= <<"psmF.eDRXC.ctnb">>
     -> true;
-is_cache_mode(#{<<"b">> := Binding})
+is_cache_mode(#{<<"b">> := Binding}, _)
     when
         Binding =:= <<"UQ">>;
         Binding =:= <<"SQ">>;
         Binding =:= <<"UQS">>
     -> true;
-is_cache_mode(_) -> false.
+is_cache_mode(_, _) -> false.
