@@ -118,9 +118,9 @@ handle_call(Request, _From, State) ->
     ?LOG(error, "adapter unexpected call ~p", [Request]),
     {reply, ignored, State, hibernate}.
 
-handle_cast({send_ul_data, EventType, Payload, BasePath}, State=#state{proto = Proto, coap_pid = CoapPid}) ->
+handle_cast({send_ul_data, EventType, Payload, BasePath}, State=#state{reg_info = #{<<"ep">> := Epn}, proto = Proto, coap_pid = CoapPid}) ->
     NewProto = send_data(EventType, Payload, Proto, BasePath),
-    flush_cached_downlink_messages(CoapPid),
+    flush_cached_downlink_messages(Epn, CoapPid),
     {noreply, State#state{proto = NewProto}};
 
 handle_cast({update_reg_info, NewRegInfo}, State=#state{life_timer = LifeTimer, reg_info = RegInfo, proto = Proto, coap_pid = CoapPid}) ->
@@ -128,14 +128,14 @@ handle_cast({update_reg_info, NewRegInfo}, State=#state{life_timer = LifeTimer, 
 
     %% - report the registration info update, but only when objectList is updated.
     case NewRegInfo of
-        #{<<"alternatePath">> := AlternatePath, <<"objectList">> := _} ->
+        #{<<"ep">> := Epn, <<"alternatePath">> := AlternatePath, <<"objectList">> := _} ->
             %send_data(<<"update">>, #{<<"data">> => UpdatedRegInfo}, Proto);
-            auto_discover(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto);
+            auto_discover(Epn, AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto);
         _ -> ok
     end,
 
     %% - flush cached donwlink commands
-    flush_cached_downlink_messages(CoapPid),
+    flush_cached_downlink_messages(maps:get(<<"ep">>, NewRegInfo), CoapPid),
 
     %% - update the life timer
     UpdatedLifeTimer = emqx_lwm2m_timer:refresh_timer(maps:get(<<"lt">>, UpdatedRegInfo), LifeTimer),
@@ -145,17 +145,17 @@ handle_cast({replace_reg_info, NewRegInfo}, State=#state{reg_info = RegInfo, lif
     UpdatedLifeTimer = emqx_lwm2m_timer:refresh_timer(maps:get(<<"lt">>, NewRegInfo), LifeTimer),
     %NewProto = send_data(<<"register">>, #{<<"data">> => NewRegInfo}, Proto),
 
-    flush_cached_downlink_messages(CoapPid),
+    flush_cached_downlink_messages(maps:get(<<"ep">>, NewRegInfo), CoapPid),
 
-    #{<<"alternatePath">> := AlternatePath} = RegInfo,
+    #{<<"ep">> := Epn, <<"alternatePath">> := AlternatePath} = RegInfo,
     %% - auto observe the objects, for demo only
     case proplists:get_value(lwm2m_auto_observe, Proto#proto_state.headers, false) of
         true ->
-            auto_observe(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto);
+            auto_observe(Epn, AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto);
         _ -> ok
     end,
 
-    auto_discover(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto),
+    auto_discover(Epn, AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto),
     
     {noreply, State#state{life_timer = UpdatedLifeTimer, reg_info = NewRegInfo, proto = Proto}, hibernate};
 
@@ -168,8 +168,8 @@ handle_info({deliver, Msg = #mqtt_message{topic = TopicName, payload = Payload}}
                             coap_pid = CoapPid, reg_info = RegInfo}) ->
     %% handle PUBLISH from broker
     ?LOG(debug, "Get MQTT message from broker, Topic: ~p, Payload: ~p", [TopicName, Payload]),
-    #{<<"alternatePath">> := AlternatePath} = RegInfo,
-    deliver_to_coap(AlternatePath, Payload, CoapPid, Proto,
+    #{<<"ep">> := Epn, <<"alternatePath">> := AlternatePath} = RegInfo,
+    deliver_to_coap(Epn, AlternatePath, Payload, CoapPid, Proto,
                     is_cache_mode(RegInfo, proplists:get_value(lwm2m_model, Headers, drx))),
 
     NewProto = proto_deliver_ack(Msg, Proto),
@@ -186,16 +186,16 @@ handle_info(post_init_process, State = #state{proto = Proto, reg_info = RegInfo,
     %% - report the registration info
     %Proto2 = send_data(<<"register">>, #{<<"data">> => RegInfo}, Proto1),
 
-    #{<<"alternatePath">> := AlternatePath} = RegInfo,
+    #{<<"ep">> := Epn, <<"alternatePath">> := AlternatePath} = RegInfo,
     %% - auto observe the objects, for demo only
     case proplists:get_value(lwm2m_auto_observe, Proto#proto_state.headers, false) of
         true ->
-            auto_observe(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto);
+            auto_observe(Epn, AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto);
         _ -> ok
     end,
 
     %% - auto discover resources
-    auto_discover(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto),
+    auto_discover(Epn, AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, Proto),
 
     {noreply, State#state{proto = Proto1, sub_topic = Topic}};
 
@@ -300,24 +300,24 @@ proto_deliver_ack(#mqtt_message{qos = ?QOS2, pktid = PacketId}, Proto) ->
     end.
 
 
-deliver_to_coap(AlternatePath, JsonData, CoapPid, Proto, CacheMode) when is_binary(JsonData)->
+deliver_to_coap(Epn, AlternatePath, JsonData, CoapPid, Proto, CacheMode) when is_binary(JsonData)->
     try
         TermData = jsx:decode(JsonData, [return_maps]),
-        deliver_to_coap(AlternatePath, TermData, CoapPid, Proto, CacheMode)
+        deliver_to_coap(Epn, AlternatePath, TermData, CoapPid, Proto, CacheMode)
     catch
         ExClass:Error ->
             ?LOG(error, "deliver_to_coap - Invalid JSON: ~p, Exception: ~p, stacktrace: ~p",
                 [JsonData, {ExClass, Error}, erlang:get_stacktrace()])
     end;
 
-deliver_to_coap(AlternatePath, TermData, CoapPid, _Proto, CacheMode) when is_map(TermData) ->
+deliver_to_coap(Epn, AlternatePath, TermData, CoapPid, _Proto, CacheMode) when is_map(TermData) ->
     ?LOG(info, "SEND To CoAP, AlternatePath=~p, Data=~p", [AlternatePath, TermData]),
     {CoapRequest, Ref} = emqx_lwm2m_cmd_handler:mqtt_payload_to_coap_request(AlternatePath, TermData),
     case CacheMode of
         false ->
             do_deliver_to_coap(CoapPid, CoapRequest, Ref);
         true ->
-            cache_downlink_message(CoapRequest, Ref)
+            cache_downlink_message(Epn, CoapRequest, Ref)
     end.
 
 downlink_topic(EventType, #proto_state{client_id = ClientID, headers = Headers}) ->
@@ -349,22 +349,22 @@ do_send_data(EventType, Payload, Proto, BasePath) ->
     {Topic, Qos} = uplink_topic(EventType, Proto),
     proto_publish(<<Topic/binary, BasePath/binary>>, jsx:encode(NewPayload), Qos, Proto).
 
-auto_observe(AlternatePath, ObjectList, CoapPid, Proto) ->
+auto_observe(Epn, AlternatePath, ObjectList, CoapPid, Proto) ->
     erlang:spawn(fun() ->
-            observe_object_list(AlternatePath, ObjectList, CoapPid, Proto)
+            observe_object_list(Epn, AlternatePath, ObjectList, CoapPid, Proto)
         end).
 
-observe_object_list(AlternatePath, ObjectList, CoapPid, Proto) ->
+observe_object_list(Epn, AlternatePath, ObjectList, CoapPid, Proto) ->
     ObjListHuawei = [<<"/19/0/0">>],
     lists:foreach(fun(ObjectPath) ->
-        observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, 100)
+        observe_object_slowly(Epn, AlternatePath, ObjectPath, CoapPid, Proto, 100)
     end, ObjListHuawei).
 
-observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, Interval) ->
-    observe_object(AlternatePath, ObjectPath, CoapPid, Proto),
+observe_object_slowly(Epn, AlternatePath, ObjectPath, CoapPid, Proto, Interval) ->
+    observe_object(Epn, AlternatePath, ObjectPath, CoapPid, Proto),
     timer:sleep(Interval).
 
-observe_object(AlternatePath, ObjectPath, CoapPid, Proto) ->
+observe_object(Epn, AlternatePath, ObjectPath, CoapPid, Proto) ->
     ObservePayload = #{
         <<"msgType">> => <<"observe">>,
         <<"data">> => #{
@@ -372,25 +372,25 @@ observe_object(AlternatePath, ObjectPath, CoapPid, Proto) ->
         }
     },
     ?LOG(info, "Observe ObjectPath: ~p", [ObjectPath]),
-    deliver_to_coap(AlternatePath, ObservePayload, CoapPid, Proto, false).
+    deliver_to_coap(Epn, AlternatePath, ObservePayload, CoapPid, Proto, false).
 
 
-auto_discover(AlternatePath, ObjectList, CoapPid, Proto) ->
+auto_discover(Epn, AlternatePath, ObjectList, CoapPid, Proto) ->
     erlang:spawn(fun() ->
             %discover_object_list(AlternatePath, ObjectList, CoapPid, Proto)
             ok
         end).
 
-discover_object_list(AlternatePath, ObjectList, CoapPid, Proto) ->
+discover_object_list(Epn, AlternatePath, ObjectList, CoapPid, Proto) ->
     lists:foreach(fun(ObjectPath) ->
-        discover_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, 100)
+        discover_object_slowly(Epn, AlternatePath, ObjectPath, CoapPid, Proto, 100)
     end, ObjectList).
 
-discover_object_slowly(AlternatePath, ObjectPath, CoapPid, Proto, Interval) ->
-    discover_object(AlternatePath, ObjectPath, CoapPid, Proto),
+discover_object_slowly(Epn, AlternatePath, ObjectPath, CoapPid, Proto, Interval) ->
+    discover_object(Epn, AlternatePath, ObjectPath, CoapPid, Proto),
     timer:sleep(Interval).
 
-discover_object(AlternatePath, ObjectPath, CoapPid, Proto) ->
+discover_object(Epn, AlternatePath, ObjectPath, CoapPid, Proto) ->
     DiscoverPayload = #{
         <<"msgType">> => <<"discover">>,
         <<"objectPath">> => ObjectPath,
@@ -400,24 +400,23 @@ discover_object(AlternatePath, ObjectPath, CoapPid, Proto) ->
         }
     },
     ?LOG(info, "Discover ObjectPath: ~p", [ObjectPath]),
-    deliver_to_coap(AlternatePath, DiscoverPayload, CoapPid, Proto, false).
+    deliver_to_coap(Epn, AlternatePath, DiscoverPayload, CoapPid, Proto, false).
 
-cache_downlink_message(CoapRequest, Ref) ->
+cache_downlink_message(Epn, CoapRequest, Ref) ->
     ?LOG(debug, "Cache downlink coap request: ~p, Ref: ~p", [CoapRequest, Ref]),
-    put(dl_msg_cache, [{CoapRequest, Ref} | get_cached_downlink_messages()]).
+    ets:insert(dl_msg_cache, [{Epn, {CoapRequest, Ref}} | get_cached_downlink_messages(Epn)]).
 
-flush_cached_downlink_messages(CoapPid) ->
-    case erase(dl_msg_cache) of
+flush_cached_downlink_messages(Epn, CoapPid) ->
+    case ets:lookup(dl_msg_cache, Epn) of
         CachedMessageList when is_list(CachedMessageList)->
-            do_deliver_to_coap_slowly(CoapPid, CachedMessageList, 100);
-        undefined -> ok
+            ets:delete(dl_msg_cache, Epn),
+            Msgs = [M || {_Epn, M} <- CachedMessageList],
+            do_deliver_to_coap_slowly(CoapPid, Msgs, 100);
+        [] -> ok
     end.
 
-get_cached_downlink_messages() ->
-    case get(dl_msg_cache) of
-        undefined -> [];
-        CachedMessageList -> CachedMessageList
-    end.
+get_cached_downlink_messages(Epn) ->
+    ets:lookup(dl_msg_cache, Epn).
 
 do_deliver_to_coap_slowly(CoapPid, CoapRequestList, Interval) ->
     erlang:spawn(fun() ->
