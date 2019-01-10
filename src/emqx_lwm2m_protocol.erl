@@ -59,19 +59,13 @@ init(CoapPid, EndpointName, PeerName, RegInfo = #{<<"lt">> := LifeTime, <<"lwm2m
                               lifetime = LifeTime,
                               coap_pid = CoapPid,
                               register_info = RegInfo},
-    case authenticate(credentials(Lwm2mState)) of
-        {ok, _IsSuper} ->
-            emqx_hooks:run('client.connected', [credentials(Lwm2mState), ?RC_SUCCESS, []]),
-            erlang:send(CoapPid, post_init),
-            erlang:send_after(2000, CoapPid, auto_observe),
-            {ok, Lwm2mState#lwm2m_state{
-                    started_at = time_now(),
-                    life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired})
-                 }};
-        {error, Reason} ->
-            emqx_hooks:run('client.connected', [credentials(Lwm2mState), ?RC_NOT_AUTHORIZED, []]),
-            {error, Reason}
-    end.
+    emqx_hooks:run('client.connected', [credentials(Lwm2mState), ?RC_SUCCESS, []]),
+    erlang:send(CoapPid, post_init),
+    erlang:send_after(2000, CoapPid, auto_observe),
+    {ok, Lwm2mState#lwm2m_state{
+            started_at = time_now(),
+            life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired})
+            }}.
 
 post_init(Lwm2mState = #lwm2m_state{endpoint_name = EndpointName, register_info = RegInfo,
                                     coap_pid = CoapPid}) ->
@@ -312,25 +306,6 @@ is_qmode(#{<<"b">> := Binding}) when Binding =:= <<"UQ">>;
 is_qmode(_) -> false.
 
 %%--------------------------------------------------------------------
-%% Authentication
-%%--------------------------------------------------------------------
-
-credentials(#lwm2m_state{peername = PeerName,
-                         endpoint_name = EndpointName}) ->
-    #{peername => PeerName, client_id => EndpointName, username => null}.
-
-authenticate(Credentials) ->
-    case emqx_access_control:authenticate(Credentials, undefined) of
-        ok -> {ok, false};
-        {ok, IsSuper} when is_boolean(IsSuper) ->
-            {ok, IsSuper};
-        {ok, Result} when is_map(Result) ->
-            {ok, maps:get(is_superuser, Result, false)};
-        {error, Error} ->
-            {error, Error}
-    end.
-
-%%--------------------------------------------------------------------
 %% Construct downlink and uplink topics
 %%--------------------------------------------------------------------
 
@@ -371,3 +346,7 @@ take_place(Text, Lwm2mState) ->
 
 take_place(Text, Placeholder, Value) ->
     binary:replace(Text, Placeholder, Value, [global]).
+
+credentials(#lwm2m_state{peername = PeerName,
+                         endpoint_name = EndpointName}) ->
+    #{peername => PeerName, client_id => EndpointName, username => null}.

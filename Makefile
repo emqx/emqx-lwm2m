@@ -5,7 +5,7 @@ PROJECT_VERSION = 3.0
 NO_AUTOPATCH = cuttlefish
 
 DEPS = lwm2m_coap jsx clique
-dep_lwm2m_coap = git-emqx https://github.com/emqx/lwm2m-coap v1.0.0
+dep_lwm2m_coap = git-emqx https://github.com/emqx/lwm2m-coap v1.0.1
 dep_jsx        = git-emqx https://github.com/talentdeficit/jsx v2.9.0
 dep_clique     = git-emqx https://github.com/emqx/clique v0.3.11
 
