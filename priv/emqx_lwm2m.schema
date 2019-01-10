@@ -23,3 +23,11 @@
   {datatype, string}
 ]}.
 
+
+{translation, "emqx_lwm2m.username", fun(Conf) ->
+  list_to_binary(cuttlefish:conf_get("lwm2m.username", Conf))
+end}.
+
+{translation, "emqx_lwm2m.password", fun(Conf) ->
+  list_to_binary(cuttlefish:conf_get("lwm2m.password", Conf))
+end}.
