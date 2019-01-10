@@ -15,4 +15,11 @@
   {datatype, string}
 ]}.
 
+{mapping, "lwm2m.username", "emqx_lwm2m.username", [
+  {datatype, string}
+]}.
+
+{mapping, "lwm2m.password", "emqx_lwm2m.password", [
+  {datatype, string}
+]}.
 

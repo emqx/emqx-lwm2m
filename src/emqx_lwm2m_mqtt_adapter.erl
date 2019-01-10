@@ -43,7 +43,8 @@
 -define(LOG(Level, Format, Args),
     lager:Level("LWM2M-MQTT: " ++ Format, Args)).
 
-
+-define(CONFIG(KEY),
+    application:get_env(emqx_lwm2m, (KEY), undefined)).
 
 -ifdef(TEST).
 -define(PROTO_INIT(A, B, C, D, E),      test_mqtt_broker:start(A, B, C, D, E)).
@@ -87,7 +88,7 @@ new_keepalive_interval(ChId, Interval) ->
 
 init({CoapPid, ClientId, ChId, KeepAliveInterval}) ->
     ?LOG(debug, "try to start adapter ClientId=~p, ChId=~p", [ClientId, ChId]),
-    case ?PROTO_INIT(ClientId, undefined, undefined, ChId, KeepAliveInterval) of
+    case ?PROTO_INIT(ClientId, ?CONFIG(username), ?CONFIG(password), ChId, KeepAliveInterval) of
         {ok, Proto}           ->
             Topic = <<"lwm2m/", ClientId/binary, "/command">>,
             NewProto = ?PROTO_SUBSCRIBE(Topic, Proto),
