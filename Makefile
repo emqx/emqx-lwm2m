@@ -13,9 +13,6 @@ BUILD_DEPS = emqx cuttlefish
 dep_emqx = git-emqx https://github.com/emqx/emqx emqx30
 dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish v2.2.1
 
-TEST_DEPS = emqttc
-dep_emqttc = git-emqx https://github.com/emqtt/emqttc master
-
 ERLC_OPTS += +debug_info
 
 $(shell [ -f erlang.mk ] || curl -s -o erlang.mk https://raw.githubusercontent.com/emqx/erlmk/master/erlang.mk)
