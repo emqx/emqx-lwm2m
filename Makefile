@@ -1,6 +1,6 @@
 PROJECT = emqx_lwm2m
 PROJECT_DESCRIPTION = EMQ X LwM2M Gateway
-PROJECT_VERSION = 3.0
+PROJECT_VERSION = 3.1
 
 NO_AUTOPATCH = cuttlefish
 
@@ -10,7 +10,7 @@ dep_jsx        = git-emqx https://github.com/talentdeficit/jsx v2.9.0
 dep_clique     = git-emqx https://github.com/emqx/clique v0.3.11
 
 BUILD_DEPS = emqx cuttlefish
-dep_emqx = git-emqx https://github.com/emqx/emqx emqx30
+dep_emqx = git-emqx https://github.com/emqx/emqx testing
 dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish v2.2.1
 
 ERLC_OPTS += +debug_info
