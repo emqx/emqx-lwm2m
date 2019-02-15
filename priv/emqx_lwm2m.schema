@@ -5,13 +5,13 @@
 
 %% defaults to 0
 {mapping, "lwm2m.lifetime_min", "emqx_lwm2m.lifetime_min", [
-  {datatype, integer},
+  {datatype, {duration, s}},
   {default, 0}
 ]}.
 
 %% defaults to 10 years
 {mapping, "lwm2m.lifetime_max", "emqx_lwm2m.lifetime_max", [
-  {datatype, integer},
+  {datatype, {duration, s}},
   {default, 315360000}
 ]}.
 
