@@ -1,6 +1,5 @@
 PROJECT = emqx_lwm2m
 PROJECT_DESCRIPTION = EMQ X LwM2M Gateway
-PROJECT_VERSION = 3.1
 
 NO_AUTOPATCH = cuttlefish
 
