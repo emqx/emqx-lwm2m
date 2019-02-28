@@ -11,7 +11,7 @@ data/
 logs/
 *.beam
 emqx_coap.d
-
+erlang.mk
 integration_test/emqx-rel/
 integration_test/build_wakaama/
 integration_test/case*.txt
