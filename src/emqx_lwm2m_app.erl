@@ -27,6 +27,7 @@
 start(_Type, _Args) ->
     Port = application:get_env(?APP, port, 5783),
     Pid = emqx_lwm2m_sup:start_link(),
+    ets:new(dl_msg_cache, [named_table, set, public]),
     emqx_lwm2m_coap_server:start(Port),
     emqx_lwm2m_cfg:register(),
     Pid.
