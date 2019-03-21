@@ -18,6 +18,9 @@
 -author("Feng Lee <feng@emqtt.io>").
 
 -behaviour(application).
+
+-emqx_plugin(?MODULE).
+
 -export([start/2, stop/1, prep_stop/1]).
 
 -include("emqx_lwm2m.hrl").
