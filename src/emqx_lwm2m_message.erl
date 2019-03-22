@@ -15,7 +15,12 @@
 
 -module(emqx_lwm2m_message).
 
--export([tlv_to_json/2, json_to_tlv/2, text_to_json/2, opaque_to_json/2, translate_json/1]).
+-export([ tlv_to_json/2
+        , json_to_tlv/2
+        , text_to_json/2
+        , opaque_to_json/2
+        , translate_json/1
+        ]).
 
 -include("emqx_lwm2m.hrl").
 

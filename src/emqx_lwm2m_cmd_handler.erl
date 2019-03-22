@@ -19,10 +19,10 @@
 
 -include_lib("lwm2m_coap/include/coap.hrl").
 
--export([mqtt2coap/2,
-         coap2mqtt/4,
-         ack2mqtt/1
-         ]).
+-export([ mqtt2coap/2
+        , coap2mqtt/4
+        , ack2mqtt/1
+        ]).
 
 -export([path_list/1]).
 

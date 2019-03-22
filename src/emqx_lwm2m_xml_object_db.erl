@@ -19,16 +19,23 @@
 -include("emqx_lwm2m.hrl").
 -include_lib("xmerl/include/xmerl.hrl").
 
-
 % This module is for future use. Disabled now.
 
-
 %% API
--export([start_link/0, stop/0, find_name/1, find_objectid/1]).
+-export([ start_link/0
+        , stop/0
+        , find_name/1
+        , find_objectid/1
+        ]).
 
 %% gen_server.
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-    terminate/2, code_change/3]).
+-export([ init/1
+        , handle_call/3
+        , handle_cast/2
+        , handle_info/2
+        , terminate/2
+        , code_change/3
+        ]).
 
 -define(LOG(Level, Format, Args),
     logger:Level("LWM2M-OBJ-DB: " ++ Format, Args)).

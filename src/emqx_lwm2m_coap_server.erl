@@ -19,7 +19,10 @@
 
 -include("emqx_lwm2m.hrl").
 
--export([start/0, start/1, stop/0]).
+-export([ start/0
+        , start/1
+        , stop/0
+        ]).
 
 -define(LOG(Level, Format, Args),
     logger:Level("LWM2M: " ++ Format, Args)).

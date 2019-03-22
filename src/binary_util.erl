@@ -3,27 +3,27 @@
 %% copied from https://github.com/arcusfelis/binary2
 
 %% Bytes
--export([ reverse/1,
-          join/2,
-          duplicate/2,
-          suffix/2,
-          prefix/2
+-export([ reverse/1
+        , join/2
+        , duplicate/2
+        , suffix/2
+        , prefix/2
         ]).
 
 %% Bits
--export([ union/2,
-          subtract/2,
-          intersection/2,
-          inverse/1
+-export([ union/2
+        , subtract/2
+        , intersection/2
+        , inverse/1
         ]).
 
 %% Trimming
--export([ rtrim/1,
-          rtrim/2,
-          ltrim/1,
-          ltrim/2,
-          trim/1,
-          trim/2
+-export([ rtrim/1
+        , rtrim/2
+        , ltrim/1
+        , ltrim/2
+        , trim/1
+        , trim/2
         ]).
 
 %% Parsing

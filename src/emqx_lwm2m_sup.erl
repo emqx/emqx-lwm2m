@@ -19,7 +19,9 @@
 
 -behaviour(supervisor).
 
--export([start_link/0, init/1]).
+-export([ start_link/0
+        , init/1
+        ]).
 
 -define(CHILD(M), {M, {M, start_link, []}, permanent, 5000, worker, [M]}).
 

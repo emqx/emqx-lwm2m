@@ -17,7 +17,11 @@
 
 -author("Feng Lee <feng@emqtt.io>").
 
--export([tlv_to_json/2, json_to_tlv/2, text_to_json/2, opaque_to_json/2]).
+-export([ tlv_to_json/2
+        , json_to_tlv/2
+        , text_to_json/2
+        , opaque_to_json/2
+        ]).
 
 -include("emqx_lwm2m.hrl").
 
