@@ -16,8 +16,13 @@
 
 -define(APP, emqx_lwm2m).
 
--record(coap_mqtt_auth, {clientid, username, password}).
--record(lwm2m_context, {epn, location}).
+-record(coap_mqtt_auth, { clientid
+                        , username
+                        , password
+                        }).
+-record(lwm2m_context, { epn
+                       , location
+                       }).
 
 -define(OMA_ALTER_PATH_RT, <<"\"oma.lwm2m\"">>).
 

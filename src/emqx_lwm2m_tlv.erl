@@ -17,7 +17,9 @@
 
 -author("Feng Lee <feng@emqtt.io>").
 
--export([parse/1, encode/1]).
+-export([ parse/1
+        , encode/1
+        ]).
 
 -include("emqx_lwm2m.hrl").
 
