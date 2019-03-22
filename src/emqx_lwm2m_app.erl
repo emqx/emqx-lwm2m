@@ -21,7 +21,10 @@
 
 -emqx_plugin(?MODULE).
 
--export([start/2, stop/1, prep_stop/1]).
+-export([ start/2
+        , stop/1
+        , prep_stop/1
+        ]).
 
 -include("emqx_lwm2m.hrl").
 

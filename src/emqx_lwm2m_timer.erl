@@ -19,9 +19,16 @@
 
 -include("emqx_lwm2m.hrl").
 
--export([cancel_timer/1, start_timer/2, refresh_timer/1, refresh_timer/2]).
+-export([ cancel_timer/1
+        , start_timer/2
+        , refresh_timer/1
+        , refresh_timer/2
+        ]).
 
--record(timer_state, {interval, tref, message}).
+-record(timer_state, { interval
+                     , tref
+                     , message
+                     }).
 
 -define(LOG(Level, Format, Args),
     logger:Level("LWM2M-TIMER: " ++ Format, Args)).
