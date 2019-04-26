@@ -59,7 +59,7 @@ init(CoapPid, EndpointName, PeerName, RegInfo = #{<<"lt">> := LifeTime, <<"lwm2m
                               lifetime = LifeTime,
                               coap_pid = CoapPid,
                               register_info = RegInfo},
-    emqx_hooks:run('client.connected', [credentials(Lwm2mState), ?RC_SUCCESS, []]),
+    emqx_hooks:run('client.connected', [credentials(Lwm2mState), ?RC_SUCCESS, #{}]),
     erlang:send(CoapPid, post_init),
     erlang:send_after(2000, CoapPid, auto_observe),
     {ok, Lwm2mState#lwm2m_state{
