@@ -19,3 +19,5 @@ integration_test/paho/
 integration_test/wakaama/
 _build/
 rebar.lock
+rebar3.crashdump
+*.conf.rendered
