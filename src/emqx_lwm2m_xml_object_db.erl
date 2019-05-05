@@ -49,7 +49,6 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -59,21 +58,21 @@ find_objectid(ObjectId) ->
                         false -> ObjectId
                     end,
     case ets:lookup(?LWM2M_OBJECT_DEF_TAB, ObjectIdInt) of
-        []                -> error(no_xml_definition);
+        [] -> error(no_xml_definition);
         [{ObjectId, Xml}] -> Xml
     end.
 
 find_name(Name) ->
-    NameBinary =    case is_list(Name) of
-                        true -> list_to_binary(Name);
-                        false -> Name
-                    end,
+    NameBinary = case is_list(Name) of
+                     true -> list_to_binary(Name);
+                     false -> Name
+                 end,
     case ets:lookup(?LWM2M_OBJECT_NAME_TO_ID_TAB, NameBinary) of
-        []                 ->
+        [] ->
             undefined;
         [{NameBinary, ObjectId}] ->
             case ets:lookup(?LWM2M_OBJECT_DEF_TAB, ObjectId) of
-                []                -> undefined;
+                [] -> undefined;
                 [{ObjectId, Xml}] -> Xml
             end
     end.
