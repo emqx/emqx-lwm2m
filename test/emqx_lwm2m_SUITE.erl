@@ -30,15 +30,14 @@
 -define(lixiang_encode(Value), (Value)).
 
 all() ->
-    [
-        {group, test_grp_0_register},
-        {group, test_grp_1_read},
-        {group, test_grp_2_write},
-        {group, test_grp_3_execute},
-        {group, test_grp_4_discover},
-        {group, test_grp_5_write_attr},
-        {group, test_grp_6_observe}
-     ].
+    [ {group, test_grp_0_register}
+    , {group, test_grp_1_read}
+    , {group, test_grp_2_write}
+    , {group, test_grp_3_execute}
+    , {group, test_grp_4_discover}
+    , {group, test_grp_5_write_attr}
+    , {group, test_grp_6_observe}
+    ].
 
 suite() -> [{timetrap, {seconds, 90}}].
 
@@ -107,17 +106,24 @@ groups() ->
     ].
 
 init_per_suite(Config) ->
-    run_setup_steps(emqx),
+    emqx_ct_helpers:start_apps([emqx]),
     Config.
 
 end_per_suite(Config) ->
     timer:sleep(300),
-    application:stop(emqx),
+    emqx_ct_helpers:stop_apps([emqx]),
     Config.
+
+set_special_configs(emqx) ->
+    application:set_env(emqx, acl_file, emqx_ct_helpers:deps_path(emqx, "etc/acl.conf")),
+    application:set_env(emqx, plugins_loaded_file, emqx_ct_helpers:deps_path (emqx, "test/emqx_SUITE_data/loaded_plugins")),
+    application:set_env(emqx, license_file, emqx_ct_helpers:deps_path(emqx, "etc/emqx.lic"));
+set_special_configs(_App) ->
+    ok.
 
 init_per_testcase(_AllTestCase, Config) ->
     application:set_env(emqx_lwm2m, port, ?PORT),
-    application:set_env(emqx_lwm2m, xml_dir, "../../lwm2m_xml"),
+    application:set_env(emqx_lwm2m, xml_dir, emqx_ct_helpers:deps_path(emqx_lwm2m, "lwm2m_xml")),
     application:set_env(emqx_lwm2m, lifetime_max, 86400),
     application:set_env(emqx_lwm2m, lifetime_min, 1),
     {ok, _Started} = application:ensure_all_started(emqx_lwm2m),
@@ -135,40 +141,6 @@ end_per_testcase(_AllTestCase, Config) ->
     emqx_client:disconnect(?config(emqx_c, Config)),
     ok = application:stop(emqx_lwm2m),
     ok = application:stop(lwm2m_coap).
-
-run_setup_steps(App) ->
-    NewConfig = generate_config(App),
-    lists:foreach(fun set_app_env/1, NewConfig),
-    application:ensure_all_started(App).
-
-generate_config(emqx) ->
-    Schema = cuttlefish_schema:files([local_path(["deps","emqx", "priv", "emqx.schema"])]),
-    Conf = conf_parse:file([local_path(["deps", "emqx","etc", "emqx.conf"])]),
-    cuttlefish_generator:map(Schema, Conf).
-
-get_base_dir(Module) ->
-    {file, Here} = code:is_loaded(Module),
-    filename:dirname(filename:dirname(Here)).
-
-get_base_dir() ->
-    get_base_dir(?MODULE).
-
-local_path(Components, Module) ->
-    filename:join([get_base_dir(Module) | Components]).
-
-local_path(Components) ->
-    local_path(Components, ?MODULE).
-
-set_app_env({App, Lists}) ->
-    lists:foreach(fun({acl_file, _Var}) ->
-                        application:set_env(App, acl_file, local_path(["deps", "emqx", "etc", "acl.conf"]));
-                     ({license_file, _Var}) ->
-                        application:set_env(App, license_file, local_path(["deps", "emqx", "etc", "emqx.lic"]));
-                     ({plugins_loaded_file, _Var}) ->
-                        application:set_env(App, plugins_loaded_file, local_path(["deps","emqx","test", "emqx_SUITE_data","loaded_plugins"]));
-                     ({Par, Var}) ->
-                        application:set_env(App, Par, Var)
-                  end, Lists).
 
 case01_register(Config) ->
     % ----------------------------------------
@@ -543,12 +515,9 @@ case10_read(Config) ->
     UdpSock = ?config(sock, Config),
     Epn = "urn:oma:lwm2m:oma:3",
     MsgId1 = 15,
-
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-
     emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
-
     % step 1, device register ...
     test_send_coap_request( UdpSock,
                             post,
