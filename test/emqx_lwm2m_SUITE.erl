@@ -20,7 +20,7 @@
 
 -define(PORT, 5683).
 
--define(LOGT(Format, Args), logger:debug("TEST_SUITE: " ++ Format, Args)).
+-define(LOGT(Format, Args), ct:pal("TEST_SUITE: " ++ Format, Args)).
 
 -include("emqx_lwm2m.hrl").
 -include_lib("lwm2m_coap/include/coap.hrl").
@@ -120,6 +120,7 @@ init_per_testcase(_AllTestCase, Config) ->
     application:set_env(emqx_lwm2m, xml_dir, "../../lwm2m_xml"),
     application:set_env(emqx_lwm2m, lifetime_max, 86400),
     application:set_env(emqx_lwm2m, lifetime_min, 1),
+    application:set_env(emqx_lwm2m, mountpoint, "lwm2m/%e/"),
     {ok, _Started} = application:ensure_all_started(emqx_lwm2m),
     {ok, ClientUdpSock} = gen_udp:open(0, [binary, {active, false}]),
 
