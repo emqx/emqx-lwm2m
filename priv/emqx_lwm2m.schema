@@ -43,6 +43,11 @@
   [{lb, LB}, {opts, Opts}]
 end}.
 
+{mapping, "lwm2m.mountpoint", "emqx_lwm2m.mountpoint", [
+  {datatype, string},
+  {default, ""}
+]}.
+
 {mapping, "lwm2m.topics.command", "emqx_lwm2m.topics", [
   {datatype, string},
   {default, "lwm2m/%e/dn/#"}
