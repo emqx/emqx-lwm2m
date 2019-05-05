@@ -180,7 +180,7 @@ do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
 
 subscribe(_CoapPid, Topic, Qos, EndpointName) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => Qos, first => true},
-    emqx_broker:subscribe(Topic, Opts),
+    emqx_broker:subscribe(Topic, EndpointName, Opts),
     emqx_hooks:run('session.subscribed', [#{client_id => EndpointName}, Topic, Opts]).
 
 unsubscribe(_CoapPid, Topic, EndpointName) ->
@@ -189,7 +189,7 @@ unsubscribe(_CoapPid, Topic, EndpointName) ->
     emqx_hooks:run('session.unsubscribed', [#{client_id => EndpointName}, Topic, Opts]).
 
 publish(Topic, Payload, Qos, EndpointName) ->
-    emqx_broker:publish(emqx_message:make(EndpointName, Qos, Topic, Payload)).
+    emqx_broker:publish(emqx_message:set_flag(retain, false, emqx_message:make(EndpointName, Qos, Topic, Payload))).
 
 time_now() -> erlang:system_time(second).
 
