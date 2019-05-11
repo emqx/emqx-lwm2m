@@ -15,10 +15,7 @@ BRANCH = case lists:member(CUR_BRANCH, ["master", "develop"]) of
              false -> "develop-3.2"
          end,
 
-DEPS = case lists:keyfind(deps, 1, CONFIG1) of
-           {_, Deps} -> Deps;
-           _ -> []
-       end,
+{_, DEPS} = lists:keyfind(deps, 1, CONFIG1),
 
 UrlPrefix = "https://github.com/emqx/",
 
