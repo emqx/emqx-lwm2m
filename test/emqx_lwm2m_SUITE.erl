@@ -22,7 +22,7 @@
 
 -define(LOGT(Format, Args), logger:debug("TEST_SUITE: " ++ Format, Args)).
 
--include("emqx_lwm2m.hrl").
+-include_lib("emqx_lwm2m/include/emqx_lwm2m.hrl").
 -include_lib("lwm2m_coap/include/coap.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
