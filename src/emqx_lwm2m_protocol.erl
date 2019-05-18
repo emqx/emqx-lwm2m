@@ -43,6 +43,7 @@
                       , mqtt_topic
                       , life_timer
                       , started_at
+                      , mountpoint
                       }).
 
 -define(DEFAULT_KEEP_ALIVE_DURATION,  60*2).
@@ -53,21 +54,35 @@
 %% APIs
 %%--------------------------------------------------------------------
 init(CoapPid, EndpointName, PeerName, RegInfo = #{<<"lt">> := LifeTime, <<"lwm2m">> := Ver}) ->
+    Mountpoint = list_to_binary(application:get_env(?APP, mountpoint, "")),
     Lwm2mState = #lwm2m_state{peername = PeerName,
                               endpoint_name = EndpointName,
                               version = Ver,
                               lifetime = LifeTime,
                               coap_pid = CoapPid,
-                              register_info = RegInfo},
-    emqx_hooks:run('client.connected', [credentials(Lwm2mState), ?RC_SUCCESS, []]),
-    erlang:send(CoapPid, post_init),
-    erlang:send_after(2000, CoapPid, auto_observe),
-    {ok, Lwm2mState#lwm2m_state{
-            started_at = time_now(),
-            life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired})
-            }}.
+                              register_info = RegInfo,
+                              mountpoint = Mountpoint},
+    Credentials = credentials(Lwm2mState),
+    case emqx_access_control:authenticate(Credentials) of
+        {ok, Credentials1} ->
+            emqx_hooks:run('client.connected', [Credentials1, ?RC_SUCCESS, #{peername => PeerName,
+                                                                             connected_at => os:timestamp(),
+                                                                             keepalive => LifeTime,
+                                                                             proto_ver => <<"lwm2m">>}]),
+            erlang:send(CoapPid, post_init),
+            erlang:send_after(2000, CoapPid, auto_observe),
+            {ok, Lwm2mState#lwm2m_state{started_at = time_now(),
+                                        life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired}),
+                                        mountpoint = maps:get(mountpoint, Credentials1)
+                                        }};
+        {error, Error} ->
+            emqx_hooks:run('client.connected', [Credentials, ?RC_NOT_AUTHORIZED, #{}]),
+            {error, Error}
+    end.
 
-post_init(Lwm2mState = #lwm2m_state{endpoint_name = EndpointName, register_info = RegInfo,
+
+post_init(Lwm2mState = #lwm2m_state{endpoint_name = EndpointName,
+                                    register_info = RegInfo,
                                     coap_pid = CoapPid}) ->
     %% - subscribe to the downlink_topic and wait for commands
     Topic = downlink_topic(<<"register">>, Lwm2mState),
@@ -165,7 +180,7 @@ do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
 
 subscribe(_CoapPid, Topic, Qos, EndpointName) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => Qos, first => true},
-    emqx_broker:subscribe(Topic, Opts),
+    emqx_broker:subscribe(Topic, EndpointName, Opts),
     emqx_hooks:run('session.subscribed', [#{client_id => EndpointName}, Topic, Opts]).
 
 unsubscribe(_CoapPid, Topic, EndpointName) ->
@@ -174,7 +189,7 @@ unsubscribe(_CoapPid, Topic, EndpointName) ->
     emqx_hooks:run('session.unsubscribed', [#{client_id => EndpointName}, Topic, Opts]).
 
 publish(Topic, Payload, Qos, EndpointName) ->
-    emqx_broker:publish(emqx_message:make(EndpointName, Qos, Topic, Payload)).
+    emqx_broker:publish(emqx_message:set_flag(retain, false, emqx_message:make(EndpointName, Qos, Topic, Payload))).
 
 time_now() -> erlang:system_time(second).
 
@@ -309,17 +324,17 @@ is_qmode(_) -> false.
 %% Construct downlink and uplink topics
 %%--------------------------------------------------------------------
 
-downlink_topic(EventType, Lwm2mState) ->
+downlink_topic(EventType, Lwm2mState = #lwm2m_state{mountpoint = Mountpoint}) ->
     Topics = application:get_env(?APP, topics, []),
     DnTopic = proplists:get_value(downlink_topic_key(EventType), Topics,
                                   default_downlink_topic(EventType)),
-    take_place(iolist_to_binary(DnTopic), Lwm2mState).
+    take_place(mountpoint(iolist_to_binary(DnTopic), Mountpoint), Lwm2mState).
 
-uplink_topic(EventType, Lwm2mState) ->
+uplink_topic(EventType, Lwm2mState = #lwm2m_state{mountpoint = Mountpoint}) ->
     Topics = application:get_env(?APP, topics, []),
     UpTopic = proplists:get_value(uplink_topic_key(EventType), Topics,
                                   default_uplink_topic(EventType)),
-    take_place(iolist_to_binary(UpTopic), Lwm2mState).
+    take_place(mountpoint(iolist_to_binary(UpTopic), Mountpoint), Lwm2mState).
 
 downlink_topic_key(EventType) when is_binary(EventType) ->
     command.
@@ -331,12 +346,12 @@ uplink_topic_key(EventType) when is_binary(EventType) ->
     response.
 
 default_downlink_topic(Type) when is_binary(Type)->
-    <<"lwm2m/%e/dn/#">>.
+    <<"dn/#">>.
 
 default_uplink_topic(<<"notify">>) ->
-    <<"lwm2m/%e/up/notify">>;
+    <<"up/notify">>;
 default_uplink_topic(Type) when is_binary(Type) ->
-    <<"lwm2m/%e/up/resp">>.
+    <<"up/resp">>.
 
 take_place(Text, Lwm2mState) ->
     {IPAddr, _Port} = Lwm2mState#lwm2m_state.peername,
@@ -348,5 +363,16 @@ take_place(Text, Placeholder, Value) ->
     binary:replace(Text, Placeholder, Value, [global]).
 
 credentials(#lwm2m_state{peername = PeerName,
-                         endpoint_name = EndpointName}) ->
-    #{peername => PeerName, client_id => EndpointName, username => null}.
+                         endpoint_name = EndpointName,
+                         mountpoint = Mountpoint}) ->
+    #{peername => PeerName,
+      client_id => EndpointName,
+      username => null,
+      password => null,
+      mountpoint => Mountpoint}.
+
+
+mountpoint(Topic, <<>>) ->
+    Topic;
+mountpoint(Topic, Mountpoint) ->
+    <<Mountpoint/binary, Topic/binary>>.
