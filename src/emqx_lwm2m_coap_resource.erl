@@ -351,9 +351,8 @@ delink(Str) ->
     Ltrim = binary_util:ltrim(Str, $<),
     binary_util:rtrim(Ltrim, $>).
 
-check_lwm2m_version(<<"1.0.", _PatchVerNum/binary>>) -> true;
-check_lwm2m_version(<<"1.0">>) -> true;
 check_lwm2m_version(<<"1">>)   -> true;
+check_lwm2m_version(<<"1.", _PatchVerNum/binary>>) -> true;
 check_lwm2m_version(_)         -> false.
 
 check_epn(undefined) -> false;
