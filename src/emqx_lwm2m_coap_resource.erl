@@ -128,13 +128,13 @@ coap_ack(_ChId, Ref, Lwm2mState) ->
     Lwm2mState2 = emqx_lwm2m_protocol:send_ul_data(maps:get(<<"msgType">>, MqttPayload), MqttPayload, Lwm2mState),
     {ok, Lwm2mState2}.
 
-%% Batch dispatch
-handle_info({dispatch, Topic, Msgs}, Lwm2mState) when is_list(Msgs) ->
+%% Batch deliver
+handle_info({deliver, Topic, Msgs}, Lwm2mState) when is_list(Msgs) ->
     {noreply, lists:foldl(fun(Msg, NewState) ->
-                                  element(2, handle_info({dispatch, Topic, Msg}, NewState))
+                                  element(2, handle_info({deliver, Topic, Msg}, NewState))
                           end, Lwm2mState, Msgs)};
 %% Handle MQTT Message
-handle_info({dispatch, _Topic, MqttMsg}, Lwm2mState) ->
+handle_info({deliver, _Topic, MqttMsg}, Lwm2mState) ->
     Lwm2mState2 = emqx_lwm2m_protocol:deliver(MqttMsg, Lwm2mState),
     {noreply, Lwm2mState2};
 
