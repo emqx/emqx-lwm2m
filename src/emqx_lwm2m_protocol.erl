@@ -64,11 +64,19 @@ init(CoapPid, EndpointName, PeerName, RegInfo = #{<<"lt">> := LifeTime, <<"lwm2m
                               mountpoint = Mountpoint},
     Credentials = credentials(Lwm2mState),
     case emqx_access_control:authenticate(Credentials) of
-        {ok, Credentials1} ->
-            emqx_hooks:run('client.connected', [Credentials1, ?RC_SUCCESS, #{peername => PeerName,
-                                                                             connected_at => os:timestamp(),
-                                                                             keepalive => LifeTime,
-                                                                             proto_ver => <<"lwm2m">>}]),
+        {ok, AuthResult} ->
+            Credentials1 = maps:merge(Credentials, AuthResult),
+            emqx_hooks:run('client.connected',
+                          [Credentials1, ?RC_SUCCESS,
+                          #{session => #{
+                                clean_start => true,
+                                expiry_interval => 0
+                              },
+                            proto_name => lwm2m,
+                            peername => PeerName,
+                            connected_at => os:timestamp(),
+                            keepalive => LifeTime,
+                            proto_ver => <<"lwm2m">>}]),
             erlang:send(CoapPid, post_init),
             erlang:send_after(2000, CoapPid, auto_observe),
             {ok, Lwm2mState#lwm2m_state{started_at = time_now(),
