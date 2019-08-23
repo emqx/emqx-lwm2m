@@ -130,8 +130,8 @@ init_per_testcase(_AllTestCase, Config) ->
     {ok, _Started} = application:ensure_all_started(emqx_lwm2m),
     {ok, ClientUdpSock} = gen_udp:open(0, [binary, {active, false}]),
 
-    {ok, C} = emqx_client:start_link([{host, "localhost"},{port, 1883},{client_id, <<"c1">>}]),
-    {ok, _} = emqx_client:connect(C),
+    {ok, C} = emqtt:start_link([{host, "localhost"},{port, 1883},{client_id, <<"c1">>}]),
+    {ok, _} = emqtt:connect(C),
     timer:sleep(100),
 
     [{sock, ClientUdpSock}, {emqx_c, C} | Config].
@@ -139,7 +139,7 @@ init_per_testcase(_AllTestCase, Config) ->
 end_per_testcase(_AllTestCase, Config) ->
     timer:sleep(300),
     gen_udp:close(?config(sock, Config)),
-    emqx_client:disconnect(?config(emqx_c, Config)),
+    emqtt:disconnect(?config(emqx_c, Config)),
     ok = application:stop(emqx_lwm2m),
     ok = application:stop(lwm2m_coap).
 
@@ -233,7 +233,7 @@ case01_register_report(Config) ->
     MsgId = 12,
     SubTopic = list_to_binary("lwm2m/"++Epn++"/dn/#"),
     ReportTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), ReportTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), ReportTopic, qos0),
     timer:sleep(200),
 
     test_send_coap_request( UdpSock,
@@ -266,7 +266,7 @@ case02_update_deregister(Config) ->
     MsgId = 12,
     SubTopic = list_to_binary("lwm2m/"++Epn++"/dn/#"),
     ReportTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), ReportTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), ReportTopic, qos0),
     timer:sleep(200),
 
     test_send_coap_request( UdpSock,
@@ -429,7 +429,7 @@ case07_register_alternate_path_01(Config) ->
     MsgId = 12,
     SubTopic = list_to_binary("lwm2m/"++Epn++"/dn/#"),
     ReportTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), ReportTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), ReportTopic, qos0),
     timer:sleep(200),
 
     test_send_coap_request( UdpSock,
@@ -451,7 +451,7 @@ case07_register_alternate_path_02(Config) ->
     MsgId = 12,
     SubTopic = list_to_binary("lwm2m/"++Epn++"/dn/#"),
     ReportTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), ReportTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), ReportTopic, qos0),
     timer:sleep(200),
 
     test_send_coap_request( UdpSock,
@@ -473,7 +473,7 @@ case08_reregister(Config) ->
     MsgId = 12,
     SubTopic = list_to_binary("lwm2m/"++Epn++"/dn/#"),
     ReportTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), ReportTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), ReportTopic, qos0),
     timer:sleep(200),
 
     test_send_coap_request( UdpSock,
@@ -517,7 +517,7 @@ case10_read(Config) ->
     Epn = "urn:oma:lwm2m:oma:3",
     MsgId1 = 15,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
     % step 1, device register ...
     test_send_coap_request( UdpSock,
@@ -578,7 +578,7 @@ case10_read_separate_ack(Config) ->
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
 
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     % step 1, device register ...
@@ -641,7 +641,7 @@ case11_read_object_tlv(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -703,7 +703,7 @@ case11_read_object_json(Config) ->
 
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -764,7 +764,7 @@ case12_read_resource_opaque(Config) ->
     MsgId1 = 15,
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -817,7 +817,7 @@ case13_read_no_xml(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -863,7 +863,7 @@ case20_single_write(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -912,7 +912,7 @@ case20_write(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -963,7 +963,7 @@ case21_write_object(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -1021,7 +1021,7 @@ case22_write_error(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -1072,7 +1072,7 @@ case_create_basic(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -1118,7 +1118,7 @@ case_delete_basic(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>, </5/0>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -1164,7 +1164,7 @@ case30_execute(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -1212,7 +1212,7 @@ case31_execute_error(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -1259,7 +1259,7 @@ case40_discover(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -1313,7 +1313,7 @@ case50_write_attribute(Config) ->
     UdpSock = ?config(sock, Config),
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -1371,8 +1371,8 @@ case60_observe(Config) ->
     ObjectList = <<"</1>, </2>, </3/0>, </4>, </5>">>,
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
     RespTopicAD = list_to_binary("lwm2m/"++Epn++"/up/notify"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopicAD, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopicAD, qos0),
     timer:sleep(200),
 
     std_register(UdpSock, Epn, ObjectList, MsgId1, RespTopic),
@@ -1502,7 +1502,7 @@ case80_specail_object_19_0_0_notify(Config) ->
     UdpSock = ?config(sock, Config),
 
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     test_send_coap_request( UdpSock,
@@ -1568,7 +1568,7 @@ case80_specail_object_19_1_0_write(Config) ->
     MsgId1 = 15,
     UdpSock = ?config(sock, Config),
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     test_send_coap_request( UdpSock,
@@ -1631,7 +1631,7 @@ server_cache_mode(Config, RegOption) ->
     MsgId1 = 15,
     UdpSock = ?config(sock, Config),
     RespTopic = list_to_binary("lwm2m/"++Epn++"/up/resp"),
-    emqx_client:subscribe(?config(emqx_c, Config), RespTopic, qos0),
+    emqtt:subscribe(?config(emqx_c, Config), RespTopic, qos0),
     timer:sleep(200),
 
     test_send_coap_request( UdpSock,
