@@ -33,8 +33,8 @@ def change_lwm2m_config():
     data = f.read()
     f.close()
     
-    if data.find("5783") > 0:
-        data = data.replace("5783", "5683")
+    if data.find("5683") > 0:
+        data = data.replace("5683", "5683")
         f = open("emqx-rel/deps/emqx_lwm2m/etc/emqx_lwm2m.conf", "wb")
         f.write(data)
         f.close()

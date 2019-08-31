@@ -74,7 +74,7 @@ w:
 $(WAKAAMA):
 	git clone https://github.com/eclipse/wakaama
 	-mkdir build_wakaama
-	# replace lightclient's source code, change port from 5683 to 5783, since 5783 is the default port of emqx-lwm2m
+	# replace lightclient's source code, change port from 5683 to 5683, since 5683 is the default port of emqx-lwm2m
 	cp -f object_security.c  wakaama/examples/lightclient/object_security.c
 	cd build_wakaama && cmake -DCMAKE_BUILD_TYPE=Debug ../wakaama/examples/lightclient && make
 	

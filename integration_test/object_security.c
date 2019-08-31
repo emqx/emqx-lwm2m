@@ -211,7 +211,7 @@ lwm2m_object_t * get_security_object()
 
         memset(targetP, 0, sizeof(security_instance_t));
         targetP->instanceId = 0;
-        targetP->uri = strdup("coap://localhost:5783");
+        targetP->uri = strdup("coap://localhost:5683");
         targetP->isBootstrap = false;
         targetP->shortID = 123;
         targetP->clientHoldOffTime = 10;
