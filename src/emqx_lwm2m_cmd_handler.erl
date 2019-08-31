@@ -213,7 +213,8 @@ attr_query_list(QueryJson = #{}, ValidAttrKeys, QueryList) ->
             (K, V, Acc) ->
                 case lists:member(K, ValidAttrKeys) of
                     true ->
-                        KV = <<K/binary, "=", V/binary>>,
+                        Val = bin(V),
+                        KV = <<K/binary, "=", Val/binary>>,
                         Acc ++ [KV];
                     false ->
                         Acc
@@ -291,3 +292,8 @@ code(bad_gateway) -> <<"5.02">>;
 code(service_unavailable) -> <<"5.03">>;
 code(gateway_timeout) -> <<"5.04">>;
 code(proxying_not_supported) -> <<"5.05">>.
+
+bin(Bin) when is_binary(Bin) -> Bin;
+bin(Str) when is_list(Str) -> list_to_binary(Str);
+bin(Int) when is_integer(Int) -> integer_to_binary(Int);
+bin(Float) when is_float(Float) -> float_to_binary(Float).
