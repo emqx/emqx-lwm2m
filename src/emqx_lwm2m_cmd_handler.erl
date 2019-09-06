@@ -1,4 +1,5 @@
-%% Copyright (c) 2013-2019 EMQ Technologies Co., Ltd. All Rights Reserved.
+%%--------------------------------------------------------------------
+%% Copyright (c) 2019 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -11,7 +12,7 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-
+%%--------------------------------------------------------------------
 
 -module(emqx_lwm2m_cmd_handler).
 
@@ -213,7 +214,8 @@ attr_query_list(QueryJson = #{}, ValidAttrKeys, QueryList) ->
             (K, V, Acc) ->
                 case lists:member(K, ValidAttrKeys) of
                     true ->
-                        KV = <<K/binary, "=", V/binary>>,
+                        Val = bin(V),
+                        KV = <<K/binary, "=", Val/binary>>,
                         Acc ++ [KV];
                     false ->
                         Acc
@@ -291,3 +293,8 @@ code(bad_gateway) -> <<"5.02">>;
 code(service_unavailable) -> <<"5.03">>;
 code(gateway_timeout) -> <<"5.04">>;
 code(proxying_not_supported) -> <<"5.05">>.
+
+bin(Bin) when is_binary(Bin) -> Bin;
+bin(Str) when is_list(Str) -> list_to_binary(Str);
+bin(Int) when is_integer(Int) -> integer_to_binary(Int);
+bin(Float) when is_float(Float) -> float_to_binary(Float).

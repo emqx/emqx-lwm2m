@@ -10,10 +10,10 @@ all:  clean_result $(EMQ) $(WAKAAMA) $(PAHO_PYTHON) start_broker clean_result ca
 	@echo "  "
 	@echo "  test complete"
 	@echo "  "
-	
+
 clean_result:
 	-rm -f case*.txt
-	
+
 start_broker:
 	-rm -f $(EMQX_DIR)/_rel/emqx/log/*
 	-$(EMQX_DIR)/_rel/emqx/bin/emqx stop
@@ -25,7 +25,7 @@ start_broker:
 
 stop_broker:
 	-$(EMQX_DIR)/_rel/emqx/bin/emqx stop
-	
+
 
 case1:
 	-build_wakaama/lightclient -4 -n jXtestlwm2m &
@@ -41,8 +41,8 @@ case3:
 	-build_wakaama/lightclient -4 -n jXtestlwm2m &
 	python case3.py
 	-ps aux|grep lightclient|awk '{print $$2}'|xargs kill -2
-	
-	
+
+
 $(EMQ):
 	git clone https://github.com/emqx/emqx-enterprise-rel
 	git clone https://github.com/emqx/emqx-lwm2m.git
@@ -74,11 +74,11 @@ w:
 $(WAKAAMA):
 	git clone https://github.com/eclipse/wakaama
 	-mkdir build_wakaama
-	# replace lightclient's source code, change port from 5683 to 5783, since 5783 is the default port of emqx-lwm2m
+	# replace lightclient's source code, change port from 5683 to 5683, since 5683 is the default port of emqx-lwm2m
 	cp -f object_security.c  wakaama/examples/lightclient/object_security.c
 	cd build_wakaama && cmake -DCMAKE_BUILD_TYPE=Debug ../wakaama/examples/lightclient && make
-	
-	
+
+
 mqtt: $(PAHO_PYTHON)
 	# short for paho python client
 
@@ -86,13 +86,13 @@ $(PAHO_PYTHON):
 	git clone https://github.com/eclipse/paho.mqtt.python.git
 	mv paho.mqtt.python/src/paho ./
 	rm -rf paho.mqtt.python
-	
-	
+
+
 r: rebuild_emq
 	# r short for rebuild_emq
 	@echo " rebuild complete "
-	
-	
+
+
 rebuild_emq:
 	-$(EMQX_DIR)/_rel/emqx/bin/emqx stop
 	-mkdir $(EMQX_DIR)/deps
@@ -109,20 +109,20 @@ rebuild_emq:
 	cp -rf ../Makefile  $(EMQX_DIR)/deps/emqx_lwm2m/Makefile
 	cp -rf ../erlang.mk $(EMQX_DIR)/deps/emqx_lwm2m/erlang.mk
 	make -C $(EMQX_DIR) -f Makefile
-	
-	
+
+
 clean: clean_result
 	-rm -f client/*.exe
 	-rm -f client/*.o
 	-rm -rf emqx-rel
 	-rm -rf build_wakaama
 	-rm -rf wakaama
-	
-	
-	
+
+
+
 lazy: clean_result start_broker case1 case2 case3 stop_broker
 	# custom your command here
 	@echo "you are so lazy"
-	
-	
-	
+
+
+
