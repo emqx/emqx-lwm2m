@@ -3,7 +3,7 @@
 
 [The LwM2M Specifications](http://www.openmobilealliance.org/release/LightweightM2M) is a Lightweight Machine to Machine protocol.
 
-With `emqx_lwm2m`, user is able to send LwM2M commands(READ/WRITE/EXECUTE/...) and get LwM2M response in mqtt way. `emqx_lwm2m` transforms data between mqtt and LwM2M protocol.
+With `emqx_lwm2m`, user is able to send LwM2M commands(READ/WRITE/EXECUTE/...) and get LwM2M response in MQTT way. `emqx_lwm2m` transforms data between MQTT and LwM2M protocol.
 
 emqx_lwm2m needs object definitions to parse data from lwm2m devices. Object definitions are declared by organizations in XML format, you could find those XMLs from [LwM2MRegistry](http://www.openmobilealliance.org/wp/OMNA/LwM2M/LwM2MRegistry.html), download and put them into the directory specified by `lwm2m.xml_dir`. If no associated object definition is found, response from device will be discarded and report an error message in log.
 
@@ -15,11 +15,11 @@ emqx_lwm2m needs object definitions to parse data from lwm2m devices. Object def
 
 ## Test emqx-lwm2m using *wakaama*
 
-[wakaama](https://github.com/eclipse/wakaama) is an easy-to-use lwm2m client tool.
+[wakaama](https://github.com/eclipse/wakaama) is an easy-to-use lwm2m client command line tool.
 
 Start *lwm2mclient* using an endpoint name `ep1`:
 ```
-./lwm2mclient -n ep1 -h 127.0.0.1 -p 5783 -4
+./lwm2mclient -n ep1 -h 127.0.0.1 -p 5683 -4
 ```
 
 To send an LwM2M DISCOVER command to *lwm2mclient*, publish an MQTT message to topic `lwm2m/<epn>/dn` (where `<epn>` is the endpoint name of the client), with following payload:
@@ -54,7 +54,7 @@ The MQTT message will be translated to an LwM2M DISCOVER command and sent to the
 }
 ```
 
-## LwM2M <--> MQTT 消息对应关系
+## LwM2M <--> MQTT Mapping
 
 ### Register/Update (LwM2M Client Registration Interface)
 
@@ -98,7 +98,7 @@ The MQTT message will be translated to an LwM2M DISCOVER command and sent to the
     }
     ```
     - {?ReqID}: Integer, request-id, used for matching the response to the request
-    - {?MsgType}: String, 可以是以下几种取值:
+    - {?MsgType}: String, can be one of the following:
       - "read": LwM2M Read
       - "discover": LwM2M Discover
       - "write": LwM2M Write
@@ -274,13 +274,13 @@ The MQTT message will be translated to an LwM2M DISCOVER command and sent to the
         - {?ValueType}: String, can be: "Time", "String", "Integer", "Float", "Boolean", "Opaque", "Objlnk"
         - {?Value}: Value of the resource, depends on "type".
 
-    - **If {?MsgType} = "ack" 时 "data" 字段不存在**
+    - **If {?MsgType} = "ack", "data" does not exists**
 
 ### Observe (Information Reporting Interface - Observe/Cancel-Observe)
 
 - **To observe/cancel-observe LwM2M client, send following MQTT PUBLISH:**
   - **Method:** PUBLISH
-  - **Topic:** `lwm2m/{?EndpointName}/dn` (这个 topic 在 emqx_aep_da 插件里可以配置)
+  - **Topic:** `lwm2m/{?EndpointName}/dn`
   - **Request Payload**:
     ```json
     {
