@@ -35,7 +35,7 @@
         , init/4
         ]).
 
--record(lwm2m_state, {  peername
+-record(lwm2m_state, {  peerhost
                       , endpoint_name
                       , version
                       , lifetime
@@ -54,9 +54,9 @@
 %%--------------------------------------------------------------------
 %% APIs
 %%--------------------------------------------------------------------
-init(CoapPid, EndpointName, PeerName, RegInfo = #{<<"lt">> := LifeTime, <<"lwm2m">> := Ver}) ->
+init(CoapPid, EndpointName, {PeerHost, _Port}, RegInfo = #{<<"lt">> := LifeTime, <<"lwm2m">> := Ver}) ->
     Mountpoint = list_to_binary(application:get_env(?APP, mountpoint, "")),
-    Lwm2mState = #lwm2m_state{peername = PeerName,
+    Lwm2mState = #lwm2m_state{peerhost = PeerHost,
                               endpoint_name = EndpointName,
                               version = Ver,
                               lifetime = LifeTime,
@@ -69,12 +69,10 @@ init(CoapPid, EndpointName, PeerName, RegInfo = #{<<"lt">> := LifeTime, <<"lwm2m
             Credentials1 = maps:merge(Credentials, AuthResult),
             emqx_hooks:run('client.connected',
                           [Credentials1, ?RC_SUCCESS,
-                          #{session => #{
-                                clean_start => true,
-                                expiry_interval => 0
-                              },
+                          #{clean_start => true,
+                            expiry_interval => 0,
                             proto_name => lwm2m,
-                            peername => PeerName,
+                            peerhost => PeerHost,
                             connected_at => os:timestamp(),
                             keepalive => LifeTime,
                             proto_ver => <<"lwm2m">>}]),
@@ -157,9 +155,9 @@ deliver(#message{topic = Topic, payload = Payload}, Lwm2mState = #lwm2m_state{co
     deliver_to_coap(AlternatePath, Payload, CoapPid, IsCacheMode),
     Lwm2mState.
 
-get_info(Lwm2mState = #lwm2m_state{endpoint_name = EndpointName, peername = PeerName,
+get_info(Lwm2mState = #lwm2m_state{endpoint_name = EndpointName, peerhost = PeerHost,
                                    started_at = StartedAt}) ->
-    ProtoInfo  = [{peername, PeerName}, {endpoint_name, EndpointName}, {started_at, StartedAt}],
+    ProtoInfo  = [{peerhost, PeerHost}, {endpoint_name, EndpointName}, {started_at, StartedAt}],
     {Stats, _} = get_stats(Lwm2mState),
     {lists:append([ProtoInfo, Stats]), Lwm2mState}.
 
@@ -363,7 +361,7 @@ default_uplink_topic(Type) when is_binary(Type) ->
     <<"up/resp">>.
 
 take_place(Text, Lwm2mState) ->
-    {IPAddr, _Port} = Lwm2mState#lwm2m_state.peername,
+    IPAddr = Lwm2mState#lwm2m_state.peerhost,
     IPAddrBin = iolist_to_binary(esockd_net:ntoa(IPAddr)),
     take_place(take_place(Text, <<"%a">>, IPAddrBin),
                     <<"%e">>, Lwm2mState#lwm2m_state.endpoint_name).
@@ -371,10 +369,10 @@ take_place(Text, Lwm2mState) ->
 take_place(Text, Placeholder, Value) ->
     binary:replace(Text, Placeholder, Value, [global]).
 
-credentials(#lwm2m_state{peername = PeerName,
+credentials(#lwm2m_state{peerhost = PeerHost,
                          endpoint_name = EndpointName,
                          mountpoint = Mountpoint}) ->
-    #{peername => PeerName,
+    #{peerhost => PeerHost,
       client_id => EndpointName,
       username => null,
       password => null,
