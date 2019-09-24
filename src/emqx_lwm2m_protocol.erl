@@ -63,12 +63,12 @@ init(CoapPid, EndpointName, {PeerHost, _Port}, RegInfo = #{<<"lt">> := LifeTime,
                               coap_pid = CoapPid,
                               register_info = RegInfo,
                               mountpoint = Mountpoint},
-    Credentials = credentials(Lwm2mState),
-    case emqx_access_control:authenticate(Credentials) of
+    ClientInfo = credentials(Lwm2mState),
+    case emqx_access_control:authenticate(ClientInfo) of
         {ok, AuthResult} ->
-            Credentials1 = maps:merge(Credentials, AuthResult),
+            ClientInfo1 = maps:merge(ClientInfo, AuthResult),
             emqx_hooks:run('client.connected',
-                          [Credentials1, ?RC_SUCCESS,
+                          [ClientInfo1, ?RC_SUCCESS,
                           #{clean_start => true,
                             expiry_interval => 0,
                             proto_name => lwm2m,
@@ -80,10 +80,10 @@ init(CoapPid, EndpointName, {PeerHost, _Port}, RegInfo = #{<<"lt">> := LifeTime,
             erlang:send_after(2000, CoapPid, auto_observe),
             {ok, Lwm2mState#lwm2m_state{started_at = time_now(),
                                         life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired}),
-                                        mountpoint = maps:get(mountpoint, Credentials1)
+                                        mountpoint = maps:get(mountpoint, ClientInfo1)
                                         }};
         {error, Error} ->
-            emqx_hooks:run('client.connected', [Credentials, ?RC_NOT_AUTHORIZED, #{}]),
+            emqx_hooks:run('client.connected', [ClientInfo, ?RC_NOT_AUTHORIZED, #{}]),
             {error, Error}
     end.
 
@@ -188,12 +188,12 @@ do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
 subscribe(_CoapPid, Topic, Qos, EndpointName) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => Qos, first => true},
     emqx_broker:subscribe(Topic, EndpointName, Opts),
-    emqx_hooks:run('session.subscribed', [#{client_id => EndpointName}, Topic, Opts]).
+    emqx_hooks:run('session.subscribed', [#{clientid => EndpointName}, Topic, Opts]).
 
 unsubscribe(_CoapPid, Topic, EndpointName) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => 0},
     emqx_broker:unsubscribe(Topic),
-    emqx_hooks:run('session.unsubscribed', [#{client_id => EndpointName}, Topic, Opts]).
+    emqx_hooks:run('session.unsubscribed', [#{clientid => EndpointName}, Topic, Opts]).
 
 publish(Topic, Payload, Qos, EndpointName) ->
     emqx_broker:publish(emqx_message:set_flag(retain, false, emqx_message:make(EndpointName, Qos, Topic, Payload))).
@@ -373,7 +373,7 @@ credentials(#lwm2m_state{peerhost = PeerHost,
                          endpoint_name = EndpointName,
                          mountpoint = Mountpoint}) ->
     #{peerhost => PeerHost,
-      client_id => EndpointName,
+      clientid => EndpointName,
       username => null,
       password => null,
       mountpoint => Mountpoint}.
