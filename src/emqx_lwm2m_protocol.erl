@@ -188,12 +188,12 @@ do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
 subscribe(_CoapPid, Topic, Qos, EndpointName) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => Qos, first => true},
     emqx_broker:subscribe(Topic, EndpointName, Opts),
-    emqx_hooks:run('session.subscribed', [#{client_id => EndpointName}, Topic, Opts]).
+    emqx_hooks:run('session.subscribed', [#{clientid => EndpointName}, Topic, Opts]).
 
 unsubscribe(_CoapPid, Topic, EndpointName) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => 0},
     emqx_broker:unsubscribe(Topic),
-    emqx_hooks:run('session.unsubscribed', [#{client_id => EndpointName}, Topic, Opts]).
+    emqx_hooks:run('session.unsubscribed', [#{clientid => EndpointName}, Topic, Opts]).
 
 publish(Topic, Payload, Qos, EndpointName) ->
     emqx_broker:publish(emqx_message:set_flag(retain, false, emqx_message:make(EndpointName, Qos, Topic, Payload))).
@@ -373,7 +373,7 @@ credentials(#lwm2m_state{peerhost = PeerHost,
                          endpoint_name = EndpointName,
                          mountpoint = Mountpoint}) ->
     #{peerhost => PeerHost,
-      client_id => EndpointName,
+      clientid => EndpointName,
       username => null,
       password => null,
       mountpoint => Mountpoint}.

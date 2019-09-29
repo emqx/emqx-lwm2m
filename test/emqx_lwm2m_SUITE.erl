@@ -130,7 +130,7 @@ init_per_testcase(_AllTestCase, Config) ->
     {ok, _Started} = application:ensure_all_started(emqx_lwm2m),
     {ok, ClientUdpSock} = gen_udp:open(0, [binary, {active, false}]),
 
-    {ok, C} = emqtt:start_link([{host, "localhost"},{port, 1883},{client_id, <<"c1">>}]),
+    {ok, C} = emqtt:start_link([{host, "localhost"},{port, 1883},{clientid, <<"c1">>}]),
     {ok, _} = emqtt:connect(C),
     timer:sleep(100),
 
