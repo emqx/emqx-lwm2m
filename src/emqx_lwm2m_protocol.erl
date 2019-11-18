@@ -362,7 +362,7 @@ default_uplink_topic(Type) when is_binary(Type) ->
 
 take_place(Text, Lwm2mState) ->
     IPAddr = Lwm2mState#lwm2m_state.peerhost,
-    IPAddrBin = iolist_to_binary(esockd_net:ntoa(IPAddr)),
+    IPAddrBin = iolist_to_binary(inet:ntoa(IPAddr)),
     take_place(take_place(Text, <<"%a">>, IPAddrBin),
                     <<"%e">>, Lwm2mState#lwm2m_state.endpoint_name).
 
