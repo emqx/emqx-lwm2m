@@ -377,7 +377,7 @@ credentials(#lwm2m_state{peerhost = PeerHost,
       username => null,
       password => null,
       mountpoint => Mountpoint,
-      zone => external}.
+      zone => undefined}.
 
 
 mountpoint(Topic, <<>>) ->
