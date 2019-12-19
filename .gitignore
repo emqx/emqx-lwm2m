@@ -21,3 +21,4 @@ _build/
 rebar.lock
 rebar3.crashdump
 *.conf.rendered
+.rebar3/

@@ -1,3 +1,5 @@
+%% -*-: erlang -*-
+
 {mapping, "lwm2m.port", "emqx_lwm2m.port", [
   {datatype, integer},
   {default, 5683}
