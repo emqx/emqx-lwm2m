@@ -63,12 +63,12 @@ init(CoapPid, EndpointName, {PeerHost, _Port}, RegInfo = #{<<"lt">> := LifeTime,
                               coap_pid = CoapPid,
                               register_info = RegInfo,
                               mountpoint = Mountpoint},
-    Credentials = credentials(Lwm2mState),
-    case emqx_access_control:authenticate(Credentials) of
+    ClientInfo = clientinfo(Lwm2mState),
+    case emqx_access_control:authenticate(ClientInfo) of
         {ok, AuthResult} ->
-            Credentials1 = maps:merge(Credentials, AuthResult),
+            ClientInfo1 = maps:merge(ClientInfo, AuthResult),
             emqx_hooks:run('client.connected',
-                          [Credentials1, ?RC_SUCCESS,
+                          [ClientInfo1, ?RC_SUCCESS,
                           #{clean_start => true,
                             expiry_interval => 0,
                             proto_name => lwm2m,
@@ -80,10 +80,10 @@ init(CoapPid, EndpointName, {PeerHost, _Port}, RegInfo = #{<<"lt">> := LifeTime,
             erlang:send_after(2000, CoapPid, auto_observe),
             {ok, Lwm2mState#lwm2m_state{started_at = time_now(),
                                         life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired}),
-                                        mountpoint = maps:get(mountpoint, Credentials1)
+                                        mountpoint = maps:get(mountpoint, ClientInfo1)
                                         }};
         {error, Error} ->
-            emqx_hooks:run('client.connected', [Credentials, ?RC_NOT_AUTHORIZED, #{}]),
+            emqx_hooks:run('client.connected', [ClientInfo, ?RC_NOT_AUTHORIZED, #{}]),
             {error, Error}
     end.
 
@@ -183,7 +183,7 @@ clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
 do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
     ?LOG(debug, "unsubscribe ~p while exiting", [SubTopic]),
     unsubscribe(CoapPid, SubTopic, Lwm2mState#lwm2m_state.endpoint_name),
-    emqx_hooks:run('client.disconnected', [credentials(Lwm2mState), Error]).
+    emqx_hooks:run('client.disconnected', [clientinfo(Lwm2mState), Error]).
 
 subscribe(_CoapPid, Topic, Qos, EndpointName) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => Qos, first => true},
@@ -369,9 +369,9 @@ take_place(Text, Lwm2mState) ->
 take_place(Text, Placeholder, Value) ->
     binary:replace(Text, Placeholder, Value, [global]).
 
-credentials(#lwm2m_state{peerhost = PeerHost,
-                         endpoint_name = EndpointName,
-                         mountpoint = Mountpoint}) ->
+clientinfo(#lwm2m_state{peerhost = PeerHost,
+                        endpoint_name = EndpointName,
+                        mountpoint = Mountpoint}) ->
     #{peerhost => PeerHost,
       clientid => EndpointName,
       username => null,
