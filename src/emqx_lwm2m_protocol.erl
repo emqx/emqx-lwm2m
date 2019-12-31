@@ -35,28 +35,43 @@
         , init/4
         ]).
 
--record(lwm2m_state, {  peerhost
-                      , endpoint_name
-                      , version
-                      , lifetime
-                      , coap_pid
-                      , register_info
-                      , mqtt_topic
-                      , life_timer
-                      , started_at
-                      , mountpoint
-                      }).
+%% For Mgmt
+-export([call/2]).
+
+-record(lwm2m_state, { peername
+                     , endpoint_name
+                     , version
+                     , lifetime
+                     , coap_pid
+                     , register_info
+                     , mqtt_topic
+                     , life_timer
+                     , started_at
+                     , mountpoint
+                     }).
 
 -define(DEFAULT_KEEP_ALIVE_DURATION,  60*2).
+
+-define(CONN_STATS, [recv_pkt, recv_msg, send_pkt, send_msg]).
+
+-define(SUBOPTS, #{rh => 0, rap => 0, nl => 0, qos => 0, is_new => true}).
 
 -define(LOG(Level, Format, Args), logger:Level("LWM2M-PROTO: " ++ Format, Args)).
 
 %%--------------------------------------------------------------------
 %% APIs
 %%--------------------------------------------------------------------
-init(CoapPid, EndpointName, {PeerHost, _Port}, RegInfo = #{<<"lt">> := LifeTime, <<"lwm2m">> := Ver}) ->
+
+call(Pid, Msg) ->
+    case catch gen_server:call(Pid, Msg) of
+        ok -> ok;
+        {'EXIT', {{shutdown, kick},_}} -> ok;
+        Error -> {error, Error}
+    end.
+
+init(CoapPid, EndpointName, Peername = {_Peerhost, _Port}, RegInfo = #{<<"lt">> := LifeTime, <<"lwm2m">> := Ver}) ->
     Mountpoint = list_to_binary(application:get_env(?APP, mountpoint, "")),
-    Lwm2mState = #lwm2m_state{peerhost = PeerHost,
+    Lwm2mState = #lwm2m_state{peername = Peername,
                               endpoint_name = EndpointName,
                               version = Ver,
                               lifetime = LifeTime,
@@ -67,23 +82,18 @@ init(CoapPid, EndpointName, {PeerHost, _Port}, RegInfo = #{<<"lt">> := LifeTime,
     case emqx_access_control:authenticate(ClientInfo) of
         {ok, AuthResult} ->
             ClientInfo1 = maps:merge(ClientInfo, AuthResult),
-            emqx_hooks:run('client.connected',
-                          [ClientInfo1, ?RC_SUCCESS,
-                          #{clean_start => true,
-                            expiry_interval => 0,
-                            proto_name => lwm2m,
-                            peerhost => PeerHost,
-                            connected_at => erlang:system_time(second),
-                            keepalive => LifeTime,
-                            proto_ver => <<"lwm2m">>}]),
+            ClientInfo2 = maps:put(sockport, application:get_env(emqx_lwm2m, port, 5683), ClientInfo1),
+            Lwm2mState1 = Lwm2mState#lwm2m_state{started_at = time_now(),
+                                                 mountpoint = maps:get(mountpoint, ClientInfo2)},
+            emqx_hooks:run('client.connected', [ClientInfo2, conninfo(Lwm2mState1)]),
+
             erlang:send(CoapPid, post_init),
             erlang:send_after(2000, CoapPid, auto_observe),
-            {ok, Lwm2mState#lwm2m_state{started_at = time_now(),
-                                        life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired}),
-                                        mountpoint = maps:get(mountpoint, ClientInfo1)
-                                        }};
+
+            emqx_cm:register_channel(EndpointName, info(Lwm2mState1), stats(Lwm2mState1)),
+
+            {ok, Lwm2mState1#lwm2m_state{life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired})}};
         {error, Error} ->
-            emqx_hooks:run('client.connected', [ClientInfo, ?RC_NOT_AUTHORIZED, #{}]),
             {error, Error}
     end.
 
@@ -155,7 +165,7 @@ deliver(#message{topic = Topic, payload = Payload}, Lwm2mState = #lwm2m_state{co
     deliver_to_coap(AlternatePath, Payload, CoapPid, IsCacheMode),
     Lwm2mState.
 
-get_info(Lwm2mState = #lwm2m_state{endpoint_name = EndpointName, peerhost = PeerHost,
+get_info(Lwm2mState = #lwm2m_state{endpoint_name = EndpointName, peername = {PeerHost, _},
                                    started_at = StartedAt}) ->
     ProtoInfo  = [{peerhost, PeerHost}, {endpoint_name, EndpointName}, {started_at, StartedAt}],
     {Stats, _} = get_stats(Lwm2mState),
@@ -166,8 +176,11 @@ get_stats(Lwm2mState) ->
     {Stats, Lwm2mState}.
 
 terminate(Reason, Lwm2mState = #lwm2m_state{coap_pid = CoapPid, life_timer = LifeTimer,
-                                            mqtt_topic = SubTopic}) ->
+                                            mqtt_topic = SubTopic, endpoint_name = EndpointName}) ->
     ?LOG(debug, "process terminated: ~p", [Reason]),
+
+    emqx_cm:unregister_channel(EndpointName),
+
     is_reference(LifeTimer) andalso emqx_lwm2m_timer:cancel_timer(LifeTimer),
     clean_subscribe(CoapPid, Reason, SubTopic, Lwm2mState);
 terminate(Reason, Lwm2mState) ->
@@ -183,12 +196,11 @@ clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
 do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
     ?LOG(debug, "unsubscribe ~p while exiting", [SubTopic]),
     unsubscribe(CoapPid, SubTopic, Lwm2mState#lwm2m_state.endpoint_name),
-    emqx_hooks:run('client.disconnected', [clientinfo(Lwm2mState), Error]).
+    emqx_hooks:run('client.disconnected', [clientinfo(Lwm2mState), Error, conninfo(Lwm2mState)]).
 
-subscribe(_CoapPid, Topic, Qos, EndpointName) ->
-    Opts = #{rh => 0, rap => 0, nl => 0, qos => Qos, first => true},
-    emqx_broker:subscribe(Topic, EndpointName, Opts),
-    emqx_hooks:run('session.subscribed', [#{clientid => EndpointName}, Topic, Opts]).
+subscribe(_CoapPid, Topic, _Qos, EndpointName) ->
+    emqx_broker:subscribe(Topic, EndpointName, ?SUBOPTS),
+    emqx_hooks:run('session.subscribed', [#{clientid => EndpointName}, Topic, ?SUBOPTS]).
 
 unsubscribe(_CoapPid, Topic, EndpointName) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => 0},
@@ -361,7 +373,7 @@ default_uplink_topic(Type) when is_binary(Type) ->
     <<"up/resp">>.
 
 take_place(Text, Lwm2mState) ->
-    IPAddr = Lwm2mState#lwm2m_state.peerhost,
+    {IPAddr, _} = Lwm2mState#lwm2m_state.peername,
     IPAddrBin = iolist_to_binary(inet:ntoa(IPAddr)),
     take_place(take_place(Text, <<"%a">>, IPAddrBin),
                     <<"%e">>, Lwm2mState#lwm2m_state.endpoint_name).
@@ -369,18 +381,94 @@ take_place(Text, Lwm2mState) ->
 take_place(Text, Placeholder, Value) ->
     binary:replace(Text, Placeholder, Value, [global]).
 
-clientinfo(#lwm2m_state{peerhost = PeerHost,
+clientinfo(#lwm2m_state{peername = {PeerHost, _},
                         endpoint_name = EndpointName,
                         mountpoint = Mountpoint}) ->
-    #{peerhost => PeerHost,
+    #{zone => undefined,
+      protocol => lwm2m,
+      peerhost => PeerHost,
       clientid => EndpointName,
       username => null,
       password => null,
-      mountpoint => Mountpoint,
-      zone => undefined}.
-
+      mountpoint => Mountpoint
+     }.
 
 mountpoint(Topic, <<>>) ->
     Topic;
 mountpoint(Topic, Mountpoint) ->
     <<Mountpoint/binary, Topic/binary>>.
+
+
+%%--------------------------------------------------------------------
+%% Info & Stats
+
+info(State) ->
+    ChannInfo = chann_info(State),
+    ChannInfo#{sockinfo => sockinfo(State)}.
+
+%% copies from emqx_connection:info/1
+sockinfo(#lwm2m_state{peername = Peername}) ->
+    #{socktype => udp,
+      peername => Peername,
+      sockname => {{127,0,0,1}, 5683},    %% FIXME: Sock?
+      sockstate =>  running,
+      active_n => 1
+     }.
+
+%% copies from emqx_channel:info/1
+chann_info(State) ->
+    #{conninfo => conninfo(State),
+      conn_state => connected,
+      clientinfo => clientinfo(State),
+      session => maps:from_list(session_info(State)),
+      will_msg => undefined
+     }.
+
+conninfo(#lwm2m_state{peername = Peername,
+                      started_at = StartedAt,
+                      endpoint_name = Epn}) ->
+    #{socktype => udp,
+      sockname => {{127,0,0,1}, 5683},
+      peername => Peername,
+      peercert => nossl,        %% TODO: dtls
+      conn_mod => ?MODULE,
+      proto_name => <<"lwm2m">>,
+      proto_ver => 3,
+      clean_start => true,
+      clientid => Epn,
+      username => undefined,
+      conn_props => undefined,
+      connected => true,
+      connected_at => StartedAt,
+      keepalive => 0,
+      receive_maximum => 0,
+      expiry_interval => 0
+     }.
+
+%% copies from emqx_session:info/1
+session_info(#lwm2m_state{mqtt_topic = SubTopic, started_at = StartedAt}) ->
+    [{subscriptions, #{SubTopic => ?SUBOPTS}},
+     {upgrade_qos, false},
+     {retry_interval, 0},
+     {await_rel_timeout, 0},
+     {created_at, StartedAt}
+    ].
+
+%% The stats keys copied from emqx_connection:stats/1
+stats(_State) ->
+    SockStats = [{recv_oct,0}, {recv_cnt,0}, {send_oct,0}, {send_cnt,0}, {send_pend,0}],
+    ConnStats = emqx_pd:get_counters(?CONN_STATS),
+    ChanStats = [{subscriptions_cnt, 1},
+                 {subscriptions_max, 1},
+                 {inflight_cnt, 0},
+                 {inflight_max, 0},
+                 {mqueue_len, 0},
+                 {mqueue_max, 0},
+                 {mqueue_dropped, 0},
+                 {next_pkt_id, 0},
+                 {awaiting_rel_cnt, 0},
+                 {awaiting_rel_max, 0}
+                ],
+    ProcStats = emqx_misc:proc_stats(),
+    lists:append([SockStats, ConnStats, ChanStats, ProcStats]).
+
