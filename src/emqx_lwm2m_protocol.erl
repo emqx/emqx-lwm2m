@@ -82,10 +82,10 @@ init(CoapPid, EndpointName, Peername = {_Peerhost, _Port}, RegInfo = #{<<"lt">> 
     case emqx_access_control:authenticate(ClientInfo) of
         {ok, AuthResult} ->
             ClientInfo1 = maps:merge(ClientInfo, AuthResult),
+            ClientInfo2 = maps:put(sockport, application:get_env(emqx_lwm2m, port, 5683), ClientInfo1),
             Lwm2mState1 = Lwm2mState#lwm2m_state{started_at = time_now(),
-                                                 mountpoint = maps:get(mountpoint, ClientInfo1)},
-            emqx_hooks:run('client.connected',
-                          [ClientInfo1, ?RC_SUCCESS, conninfo(Lwm2mState1)]),
+                                                 mountpoint = maps:get(mountpoint, ClientInfo2)},
+            emqx_hooks:run('client.connected', [ClientInfo2, conninfo(Lwm2mState1)]),
 
             erlang:send(CoapPid, post_init),
             erlang:send_after(2000, CoapPid, auto_observe),
@@ -94,7 +94,6 @@ init(CoapPid, EndpointName, Peername = {_Peerhost, _Port}, RegInfo = #{<<"lt">> 
 
             {ok, Lwm2mState1#lwm2m_state{life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired})}};
         {error, Error} ->
-            emqx_hooks:run('client.connected', [ClientInfo, ?RC_NOT_AUTHORIZED, #{}]),
             {error, Error}
     end.
 

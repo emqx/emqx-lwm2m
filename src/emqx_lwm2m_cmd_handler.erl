@@ -44,12 +44,13 @@ mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"read">>, <<"data">> :=
     FullPathList = add_alternate_path_prefix(AlternatePath, path_list(maps:get(<<"path">>, Data))),
     {lwm2m_coap_message:request(con, get, <<>>, [{uri_path, FullPathList}]), InputCmd};
 mqtt2coap(AlternatePath, InputCmd = #{<<"msgType">> := <<"write">>, <<"data">> := Data}) ->
+    Encoding = maps:get(<<"encoding">>, InputCmd, <<"plain">>),
     CoapRequest =
         case maps:get(<<"basePath">>, Data, <<"/">>) of
             <<"/">> ->
-                single_write_request(AlternatePath, Data);
+                single_write_request(AlternatePath, Data, Encoding);
             BasePath ->
-                batch_write_request(AlternatePath, BasePath, maps:get(<<"content">>, Data))
+                batch_write_request(AlternatePath, BasePath, maps:get(<<"content">>, Data), Encoding)
         end,
     {CoapRequest, InputCmd};
 
@@ -246,22 +247,23 @@ extract_path(Ref = #{}) ->
             Path
     end.
 
-batch_write_request(AlternatePath, BasePath, Content) ->
+batch_write_request(AlternatePath, BasePath, Content, Encoding) ->
     PathList = path_list(BasePath),
     Method = case length(PathList) of
                 2 -> post;
                 3 -> put
              end,
     FullPathList = add_alternate_path_prefix(AlternatePath, PathList),
-    TlvData = emqx_lwm2m_message:json_to_tlv(PathList, Content),
+    Content1 = decoding(Content, Encoding),
+    TlvData = emqx_lwm2m_message:json_to_tlv(PathList, Content1),
     Payload = emqx_lwm2m_tlv:encode(TlvData),
     lwm2m_coap_message:request(con, Method, Payload, [{uri_path, FullPathList}, {content_format, <<"application/vnd.oma.lwm2m+tlv">>}]).
 
-single_write_request(AlternatePath, Data) ->
+single_write_request(AlternatePath, Data, Encoding) ->
     PathList = path_list(maps:get(<<"path">>, Data)),
     FullPathList = add_alternate_path_prefix(AlternatePath, PathList),
-
-    TlvData = emqx_lwm2m_message:json_to_tlv(PathList, [Data]),
+    Datas = decoding([Data], Encoding),
+    TlvData = emqx_lwm2m_message:json_to_tlv(PathList, Datas),
     Payload = emqx_lwm2m_tlv:encode(TlvData),
     lwm2m_coap_message:request(con, put, Payload, [{uri_path, FullPathList}, {content_format, <<"application/vnd.oma.lwm2m+tlv">>}]).
 
@@ -298,3 +300,21 @@ bin(Bin) when is_binary(Bin) -> Bin;
 bin(Str) when is_list(Str) -> list_to_binary(Str);
 bin(Int) when is_integer(Int) -> integer_to_binary(Int);
 bin(Float) when is_float(Float) -> float_to_binary(Float).
+
+decoding(Datas, <<"hex">>) ->
+    lists:map(fun(Data = #{<<"value">> := Value}) ->
+        Data#{<<"value">> => hexstr_to_bin(binary_to_list(Value))}
+    end, Datas);
+decoding(Datas, _) ->
+    Datas.
+
+hexstr_to_bin(S) ->
+  hexstr_to_bin(S, []).
+hexstr_to_bin([], Acc) ->
+  list_to_binary(lists:reverse(Acc));
+hexstr_to_bin([X,Y|T], Acc) ->
+  {ok, [V], []} = io_lib:fread("~16u", [X,Y]),
+  hexstr_to_bin(T, [V | Acc]);
+hexstr_to_bin([X|T], Acc) ->
+  {ok, [V], []} = io_lib:fread("~16u", lists:flatten([X,"0"])),
+  hexstr_to_bin(T, [V | Acc]).
