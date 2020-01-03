@@ -1,5 +1,5 @@
 %%--------------------------------------------------------------------
-%% Copyright (c) 2019 EMQ Technologies Co., Ltd. All Rights Reserved.
+%% Copyright (c) 2020 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -196,7 +196,10 @@ clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
 do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
     ?LOG(debug, "unsubscribe ~p while exiting", [SubTopic]),
     unsubscribe(CoapPid, SubTopic, Lwm2mState#lwm2m_state.endpoint_name),
-    emqx_hooks:run('client.disconnected', [clientinfo(Lwm2mState), Error, conninfo(Lwm2mState)]).
+
+    ConnInfo0 = conninfo(Lwm2mState),
+    ConnInfo = ConnInfo0#{disconnected_at => erlang:system_time(second)},
+    emqx_hooks:run('client.disconnected', [clientinfo(Lwm2mState), Error, ConnInfo]).
 
 subscribe(_CoapPid, Topic, _Qos, EndpointName) ->
     emqx_broker:subscribe(Topic, EndpointName, ?SUBOPTS),
