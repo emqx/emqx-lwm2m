@@ -106,7 +106,7 @@ post_init(Lwm2mState = #lwm2m_state{endpoint_name = EndpointName,
                                     coap_pid = CoapPid}) ->
     %% - subscribe to the downlink_topic and wait for commands
     Topic = downlink_topic(<<"register">>, Lwm2mState),
-    subscribe(CoapPid, Topic, _Qos = 0, EndpointName),
+    subscribe(Topic, Lwm2mState),
     %% - report the registration info
     send_to_broker(<<"register">>, #{<<"data">> => RegInfo}, Lwm2mState),
     Lwm2mState#lwm2m_state{mqtt_topic = Topic}.
@@ -198,20 +198,20 @@ clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
 
 do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
     ?LOG(debug, "unsubscribe ~p while exiting", [SubTopic]),
-    unsubscribe(CoapPid, SubTopic, Lwm2mState#lwm2m_state.endpoint_name),
+    unsubscribe(SubTopic, Lwm2mState),
 
     ConnInfo0 = conninfo(Lwm2mState),
     ConnInfo = ConnInfo0#{disconnected_at => erlang:system_time(second)},
     run_hooks('client.disconnected', [clientinfo(Lwm2mState), Error, ConnInfo]).
 
-subscribe(_CoapPid, Topic, _Qos, EndpointName) ->
+subscribe(Topic, Lwm2mState = #lwm2m_state{endpoint_name = EndpointName}) ->
     emqx_broker:subscribe(Topic, EndpointName, ?SUBOPTS),
-    emqx_hooks:run('session.subscribed', [#{clientid => EndpointName}, Topic, ?SUBOPTS]).
+    emqx_hooks:run('session.subscribed', [clientinfo(Lwm2mState), Topic, ?SUBOPTS]).
 
-unsubscribe(_CoapPid, Topic, EndpointName) ->
+unsubscribe(Topic, Lwm2mState = #lwm2m_state{endpoint_name = EndpointName}) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => 0},
     emqx_broker:unsubscribe(Topic),
-    emqx_hooks:run('session.unsubscribed', [#{clientid => EndpointName}, Topic, Opts]).
+    emqx_hooks:run('session.unsubscribed', [clientinfo(Lwm2mState), Topic, Opts]).
 
 publish(Topic, Payload, Qos, EndpointName) ->
     emqx_broker:publish(emqx_message:set_flag(retain, false, emqx_message:make(EndpointName, Qos, Topic, Payload))).
