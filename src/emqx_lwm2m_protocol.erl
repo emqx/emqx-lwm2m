@@ -1,5 +1,5 @@
 %%--------------------------------------------------------------------
-%% Copyright (c) 2019 EMQ Technologies Co., Ltd. All Rights Reserved.
+%% Copyright (c) 2020 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -79,13 +79,16 @@ init(CoapPid, EndpointName, Peername = {_Peerhost, _Port}, RegInfo = #{<<"lt">> 
                               register_info = RegInfo,
                               mountpoint = Mountpoint},
     ClientInfo = clientinfo(Lwm2mState),
+    _ = run_hooks('client.connect', [conninfo(Lwm2mState)], undefined),
     case emqx_access_control:authenticate(ClientInfo) of
         {ok, AuthResult} ->
+            _ = run_hooks('client.connack', [conninfo(Lwm2mState), success], undefined),
+
             ClientInfo1 = maps:merge(ClientInfo, AuthResult),
             ClientInfo2 = maps:put(sockport, application:get_env(emqx_lwm2m, port, 5683), ClientInfo1),
             Lwm2mState1 = Lwm2mState#lwm2m_state{started_at = time_now(),
                                                  mountpoint = maps:get(mountpoint, ClientInfo2)},
-            emqx_hooks:run('client.connected', [ClientInfo2, conninfo(Lwm2mState1)]),
+            run_hooks('client.connected', [ClientInfo2, conninfo(Lwm2mState1)]),
 
             erlang:send(CoapPid, post_init),
             erlang:send_after(2000, CoapPid, auto_observe),
@@ -94,9 +97,9 @@ init(CoapPid, EndpointName, Peername = {_Peerhost, _Port}, RegInfo = #{<<"lt">> 
 
             {ok, Lwm2mState1#lwm2m_state{life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired})}};
         {error, Error} ->
+            _ = run_hooks('client.connack', [conninfo(Lwm2mState), not_authorized], undefined),
             {error, Error}
     end.
-
 
 post_init(Lwm2mState = #lwm2m_state{endpoint_name = EndpointName,
                                     register_info = RegInfo,
@@ -196,7 +199,10 @@ clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
 do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
     ?LOG(debug, "unsubscribe ~p while exiting", [SubTopic]),
     unsubscribe(CoapPid, SubTopic, Lwm2mState#lwm2m_state.endpoint_name),
-    emqx_hooks:run('client.disconnected', [clientinfo(Lwm2mState), Error, conninfo(Lwm2mState)]).
+
+    ConnInfo0 = conninfo(Lwm2mState),
+    ConnInfo = ConnInfo0#{disconnected_at => erlang:system_time(second)},
+    run_hooks('client.disconnected', [clientinfo(Lwm2mState), Error, ConnInfo]).
 
 subscribe(_CoapPid, Topic, _Qos, EndpointName) ->
     emqx_broker:subscribe(Topic, EndpointName, ?SUBOPTS),
@@ -398,6 +404,15 @@ mountpoint(Topic, <<>>) ->
 mountpoint(Topic, Mountpoint) ->
     <<Mountpoint/binary, Topic/binary>>.
 
+%%--------------------------------------------------------------------
+%% Helper funcs
+
+-compile({inline, [run_hooks/2, run_hooks/3]}).
+run_hooks(Name, Args) ->
+    ok = emqx_metrics:inc(Name), emqx_hooks:run(Name, Args).
+
+run_hooks(Name, Args, Acc) ->
+    ok = emqx_metrics:inc(Name), emqx_hooks:run_fold(Name, Args, Acc).
 
 %%--------------------------------------------------------------------
 %% Info & Stats
