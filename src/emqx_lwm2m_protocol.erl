@@ -393,8 +393,14 @@ clientinfo(#lwm2m_state{peername = {PeerHost, _},
     #{zone => undefined,
       protocol => lwm2m,
       peerhost => PeerHost,
+      sockport => 5683,         %% FIXME:
       clientid => EndpointName,
       username => null,
+      peercert => nossl,
+      is_bridge => false,
+      is_superuser => false,
+      mountpoint => Mountpoint
+      ws_cookie => undefined,
       password => null,
       mountpoint => Mountpoint
      }.
