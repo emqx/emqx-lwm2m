@@ -396,13 +396,12 @@ clientinfo(#lwm2m_state{peername = {PeerHost, _},
       sockport => 5683,         %% FIXME:
       clientid => EndpointName,
       username => null,
+      password => null,
       peercert => nossl,
       is_bridge => false,
       is_superuser => false,
-      mountpoint => Mountpoint
-      ws_cookie => undefined,
-      password => null,
-      mountpoint => Mountpoint
+      mountpoint => Mountpoint,
+      ws_cookie => undefined
      }.
 
 mountpoint(Topic, <<>>) ->
