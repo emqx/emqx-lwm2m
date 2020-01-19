@@ -224,7 +224,7 @@ time_now() -> erlang:system_time(second).
 
 deliver_to_coap(AlternatePath, JsonData, CoapPid, CacheMode) when is_binary(JsonData)->
     try
-        TermData = jsx:decode(JsonData, [return_maps]),
+        TermData = emqx_json:decode(JsonData, [return_maps]),
         deliver_to_coap(AlternatePath, TermData, CoapPid, CacheMode)
     catch
         C:R:Stack ->
@@ -253,7 +253,7 @@ send_to_broker(EventType, Payload = #{}, Lwm2mState) ->
 do_send_to_broker(EventType, Payload, Lwm2mState) ->
     NewPayload = maps:put(<<"msgType">>, EventType, Payload),
     Topic = uplink_topic(EventType, Lwm2mState),
-    publish(Topic, jsx:encode(NewPayload), _Qos = 0, Lwm2mState#lwm2m_state.endpoint_name).
+    publish(Topic, emqx_json:encode(NewPayload), _Qos = 0, Lwm2mState#lwm2m_state.endpoint_name).
 
 %%--------------------------------------------------------------------
 %% Auto Observe

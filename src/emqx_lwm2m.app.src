@@ -3,5 +3,5 @@
               {vsn,"git"},
               {modules,[]},
               {registered,[emqx_lwm2m_sup]},
-              {applications,[kernel,stdlib,lwm2m_coap,jsx]},
+              {applications,[kernel,stdlib,lwm2m_coap]},
               {mod,{emqx_lwm2m_app,[]}}]}.

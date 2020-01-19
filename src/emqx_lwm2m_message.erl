@@ -315,7 +315,7 @@ opaque_to_json(BaseName, Binary) ->
     [#{path => BaseName, value => base64:encode(Binary)}].
 
 translate_json(JSONBin) ->
-    JSONTerm = jsx:decode(JSONBin, [return_maps]),
+    JSONTerm = emqx_json:decode(JSONBin, [return_maps]),
     BaseName = maps:get(<<"bn">>, JSONTerm, <<>>),
     ElementList = maps:get(<<"e">>, JSONTerm, []),
     translate_element(BaseName, ElementList, []).
