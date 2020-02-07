@@ -245,7 +245,7 @@ case01_register_report(Config) ->
     timer:sleep(50),
     true = lists:member(SubTopic, test_mqtt_broker:get_subscrbied_topics()),
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"msgType">> => <<"register">>,
                                 <<"data">> => #{
                                     <<"alternatePath">> => <<"/">>,
@@ -281,7 +281,7 @@ case02_update_deregister(Config) ->
 
     ?LOGT("Options got: ~p", [Opts]),
     Location = proplists:get_value(location_path, Opts),
-    Register = jsx:encode(#{
+    Register = emqx_json:encode(#{
                               <<"msgType">> => <<"register">>,
                               <<"data">> => #{
                                   <<"alternatePath">> => <<"/">>,
@@ -307,7 +307,7 @@ case02_update_deregister(Config) ->
     #coap_message{type = ack, id = RspId2, method = Method2} = test_recv_coap_response(UdpSock),
     {ok,changed} = Method2,
     MsgId2 = RspId2,
-    Update = jsx:encode(#{
+    Update = emqx_json:encode(#{
                             <<"msgType">> => <<"update">>,
                             <<"data">> => #{
                                 <<"alternatePath">> => <<"/">>,
@@ -486,7 +486,7 @@ case08_reregister(Config) ->
     timer:sleep(50),
     true = lists:member(SubTopic, test_mqtt_broker:get_subscrbied_topics()),
 
-    ReadResult = jsx:encode(
+    ReadResult = emqx_json:encode(
                             #{
                                 <<"msgType">> => <<"register">>,
                                 <<"data">> => #{
@@ -541,7 +541,7 @@ case10_read(Config) ->
                         <<"path">> => <<"/3/0/0">>
                     }
                 },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     ?LOGT("CommandJson=~p", [CommandJson]),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
@@ -557,7 +557,7 @@ case10_read(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, content}, #coap_content{content_format = <<"text/plain">>, payload = <<"EMQ">>}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
+    ReadResult = emqx_json:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"msgType">> => <<"read">>,
                                 <<"data">> => #{
                                     <<"code">> => <<"2.05">>,
@@ -594,7 +594,7 @@ case10_read_separate_ack(Config) ->
                         <<"path">> => <<"/3/0/0">>
                     }
                 },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     ?LOGT("CommandJson=~p", [CommandJson]),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
@@ -607,7 +607,7 @@ case10_read_separate_ack(Config) ->
     ?assertEqual(<<>>, Payload2),
 
     test_send_empty_ack(UdpSock, "127.0.0.1", ?PORT, Request2),
-    ReadResultACK = jsx:encode(#{
+    ReadResultACK = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"msgType">> => <<"ack">>,
                                 <<"data">> => #{
@@ -620,7 +620,7 @@ case10_read_separate_ack(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, content}, #coap_content{content_format = <<"text/plain">>, payload = <<"EMQ">>}, Request2, false),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
+    ReadResult = emqx_json:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"msgType">> => <<"read">>,
                                 <<"data">> => #{
                                     <<"code">> => <<"2.05">>,
@@ -656,7 +656,7 @@ case11_read_object_tlv(Config) ->
                         <<"path">> => <<"/3/0">>
                     }
                 },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     ?LOGT("CommandJson=~p", [CommandJson]),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
@@ -671,7 +671,7 @@ case11_read_object_tlv(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, content}, #coap_content{content_format = <<"application/vnd.oma.lwm2m+tlv">>, payload = Tlv}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
+    ReadResult = emqx_json:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"msgType">> => <<"read">>,
                                 <<"data">> => #{
                                     <<"code">> => <<"2.05">>,
@@ -718,7 +718,7 @@ case11_read_object_json(Config) ->
                         <<"path">> => <<"/3/0">>
                     }
                 },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     ?LOGT("CommandJson=~p", [CommandJson]),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
@@ -733,7 +733,7 @@ case11_read_object_json(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, content}, #coap_content{content_format = <<"application/vnd.oma.lwm2m+json">>, payload = Json}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
+    ReadResult = emqx_json:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"msgType">> => <<"read">>,
                                 <<"data">> => #{
                                     <<"code">> => <<"2.05">>,
@@ -779,7 +779,7 @@ case12_read_resource_opaque(Config) ->
                         <<"path">> => <<"/3/0/8">>
                     }
                 },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     ?LOGT("CommandJson=~p", [CommandJson]),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
@@ -794,7 +794,7 @@ case12_read_resource_opaque(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, content}, #coap_content{content_format = <<"application/octet-stream">>, payload = Opaque}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
+    ReadResult = emqx_json:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"msgType">> => <<"read">>,
                                 <<"data">> => #{
                                     <<"code">> => <<"2.05">>,
@@ -832,7 +832,7 @@ case13_read_no_xml(Config) ->
                         <<"path">> => <<"/9723/0/0">>
                     }
                 },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     ?LOGT("CommandJson=~p", [CommandJson]),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
@@ -846,7 +846,7 @@ case13_read_no_xml(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, content}, #coap_content{content_format = <<"text/plain">>, payload = <<"EMQ">>}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
+    ReadResult = emqx_json:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"msgType">> => <<"read">>,
                                 <<"data">> => #{
                                     <<"reqPath">> => <<"/9723/0/0">>,
@@ -879,7 +879,7 @@ case20_single_write(Config) ->
                     <<"value">> => ?lixiang_encode(<<"12345">>)
                 }
                },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -894,7 +894,7 @@ case20_single_write(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, changed}, #coap_content{}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"data">> => #{
                                     <<"reqPath">> => <<"/3/0/13">>,
@@ -930,7 +930,7 @@ case20_write(Config) ->
                     }]
                 }
                },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -945,7 +945,7 @@ case20_write(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, changed}, #coap_content{}, Request2, true),
     timer:sleep(100),
 
-    WriteResult = jsx:encode(#{
+    WriteResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"data">> => #{
                                     <<"reqPath">> => <<"/3/0/13">>,
@@ -986,7 +986,7 @@ case21_write_object(Config) ->
                     }]
                 }
                },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -1003,7 +1003,7 @@ case21_write_object(Config) ->
     timer:sleep(100),
 
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"msgType">> => <<"write">>,
                                 <<"data">> => #{
@@ -1041,7 +1041,7 @@ case22_write_error(Config) ->
                     ]
                 }
                },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -1054,7 +1054,7 @@ case22_write_error(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {error, bad_request}, #coap_content{}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"data">> => #{
                                     <<"reqPath">> => <<"/3/0/1">>,
@@ -1086,7 +1086,7 @@ case_create_basic(Config) ->
                     <<"path">> => <<"/5">>
                 }
                },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -1100,7 +1100,7 @@ case_create_basic(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, created}, #coap_content{}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"data">> => #{
                                     <<"reqPath">> => <<"/5">>,
@@ -1132,7 +1132,7 @@ case_delete_basic(Config) ->
                     <<"path">> => <<"/5/0">>
                 }
                },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -1146,7 +1146,7 @@ case_delete_basic(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, deleted}, #coap_content{}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"data">> => #{
                                     <<"reqPath">> => <<"/5/0">>,
@@ -1180,7 +1180,7 @@ case30_execute(Config) ->
                     <<"args">> => <<"2,7">>
                 }
                },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -1194,7 +1194,7 @@ case30_execute(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, changed}, #coap_content{}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"data">> => #{
                                     <<"reqPath">> => <<"/3/0/4">>,
@@ -1227,7 +1227,7 @@ case31_execute_error(Config) ->
                     <<"args">> => <<"2,7">>
                 }
                },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -1241,7 +1241,7 @@ case31_execute_error(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {error, uauthorized}, #coap_content{}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"data">> => #{
                                     <<"reqPath">> => <<"/3/0/4">>,
@@ -1272,7 +1272,7 @@ case40_discover(Config) ->
                 <<"data">> => #{
                     <<"path">> => <<"/3/0/7">>
                 } },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -1293,7 +1293,7 @@ case40_discover(Config) ->
                             true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"msgType">> => <<"discover">>,
                                 <<"data">> => #{
@@ -1329,7 +1329,7 @@ case50_write_attribute(Config) ->
                     <<"pmax">> => <<"5">>,
                     <<"lt">> => <<"5">>
                 } },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(100),
     Request2 = test_recv_coap_request(UdpSock),
@@ -1352,7 +1352,7 @@ case50_write_attribute(Config) ->
                             true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"data">> => #{
                                     <<"reqPath">> => <<"/3/0/9">>,
@@ -1386,7 +1386,7 @@ case60_observe(Config) ->
                     <<"path">> => <<"/3/0/10">>
                 }
              },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -1407,7 +1407,7 @@ case60_observe(Config) ->
                                 Request2),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"msgType">> => <<"observe">>,
                                 <<"data">> => #{
@@ -1434,7 +1434,7 @@ case60_observe(Config) ->
     timer:sleep(100),
     #coap_message{} = test_recv_coap_response(UdpSock),
 
-    ReadResult2 = jsx:encode(#{
+    ReadResult2 = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"msgType">> => <<"notify">>,
                                 <<"seqNum">> => ObSeq,
@@ -1458,7 +1458,7 @@ case60_observe(Config) ->
                     <<"path">> => <<"/3/0/10">>
                 }
              },
-    CommandJson3 = jsx:encode(Command3),
+    CommandJson3 = emqx_json:encode(Command3),
     test_mqtt_broker:publish(CommandTopic, CommandJson3, 0),
     timer:sleep(50),
     Request3 = test_recv_coap_request(UdpSock),
@@ -1479,7 +1479,7 @@ case60_observe(Config) ->
                                 Request3),
     timer:sleep(100),
 
-    ReadResult3 = jsx:encode(#{
+    ReadResult3 = emqx_json:encode(#{
                                 <<"requestID">> => CmdId3, <<"cacheID">> => CmdId3,
                                 <<"msgType">> => <<"cancel-observe">>,
                                 <<"data">> => #{
@@ -1513,7 +1513,7 @@ case80_specail_object_19_0_0_notify(Config) ->
                             MsgId1),
     #coap_message{method = Method1} = test_recv_coap_response(UdpSock),
     ?assertEqual({ok,created}, Method1),
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"msgType">> => <<"register">>,
                                 <<"data">> => #{
                                     <<"alternatePath">> => <<"/">>,
@@ -1539,7 +1539,7 @@ case80_specail_object_19_0_0_notify(Config) ->
                     <<"path">> => <<"/19/0/0">>
                 }
              },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -1592,7 +1592,7 @@ case80_specail_object_19_1_0_write(Config) ->
                     <<"value">> => base64:encode(<<12345:32>>)
                 }
                },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50),
     Request2 = test_recv_coap_request(UdpSock),
@@ -1606,7 +1606,7 @@ case80_specail_object_19_1_0_write(Config) ->
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, changed}, #coap_content{}, Request2, true),
     timer:sleep(100),
 
-    ReadResult = jsx:encode(#{
+    ReadResult = emqx_json:encode(#{
                                 <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                                 <<"data">> => #{
                                     <<"code">> => <<"2.04">>,
@@ -1680,7 +1680,7 @@ send_read_command_1(CmdId, _UdpSock) ->
                         <<"path">> => <<"/3/0/0">>
                     }
                 },
-    CommandJson = jsx:encode(Command),
+    CommandJson = emqx_json:encode(Command),
     test_mqtt_broker:publish(CommandTopic, CommandJson, 0),
     timer:sleep(50).
 
@@ -1695,7 +1695,7 @@ verify_read_response_1(CmdId, UdpSock) ->
     %% device replies the commond
     test_send_coap_response(UdpSock, "127.0.0.1", ?PORT, {ok, content}, #coap_content{content_format = <<"text/plain">>, payload = <<"EMQ">>}, Request, true),
 
-    ReadResult = jsx:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
+    ReadResult = emqx_json:encode(#{  <<"requestID">> => CmdId, <<"cacheID">> => CmdId,
                             <<"msgType">> => <<"read">>,
                             <<"data">> => #{
                                 <<"code">> => <<"2.05">>,
