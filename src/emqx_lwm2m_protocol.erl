@@ -201,7 +201,7 @@ do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
     unsubscribe(SubTopic, Lwm2mState),
 
     ConnInfo0 = conninfo(Lwm2mState),
-    ConnInfo = ConnInfo0#{disconnected_at => erlang:system_time(second)},
+    ConnInfo = ConnInfo0#{disconnected_at => erlang:system_time(millisecond)},
     run_hooks('client.disconnected', [clientinfo(Lwm2mState), Error, ConnInfo]).
 
 subscribe(Topic, Lwm2mState = #lwm2m_state{endpoint_name = EndpointName}) ->
@@ -216,7 +216,7 @@ unsubscribe(Topic, Lwm2mState = #lwm2m_state{endpoint_name = EndpointName}) ->
 publish(Topic, Payload, Qos, EndpointName) ->
     emqx_broker:publish(emqx_message:set_flag(retain, false, emqx_message:make(EndpointName, Qos, Topic, Payload))).
 
-time_now() -> erlang:system_time(second).
+time_now() -> erlang:system_time(millisecond).
 
 %%--------------------------------------------------------------------
 %% Deliver downlink message to coap
