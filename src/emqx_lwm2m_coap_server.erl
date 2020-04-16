@@ -19,34 +19,34 @@
 -include("emqx_lwm2m.hrl").
 
 -export([ start/0
-        , start/1
         , stop/0
         ]).
 
 -define(LOG(Level, Format, Args),
     logger:Level("LWM2M: " ++ Format, Args)).
 
-
 start() ->
-    Port = application:get_env(?APP, port, 5683),
-    start(Port).
-
-start(Port) ->
     {ok, _} = application:ensure_all_started(lwm2m_coap),
 
     ResourceHandlers = [
         {[<<"rd">>], emqx_lwm2m_coap_resource, undefined}
     ],
     lwm2m_coap_server:start_registry(ResourceHandlers),
-
     Opts = application:get_env(?APP, options, []),
-    lwm2m_coap_server:start_udp(lwm2m_udp_socket, Port, Opts),
+    Port = proplists:get_value(port, Opts, 5683),
+    DtlsPort = proplists:get_value(dtls_port, Opts, 5684),
+
+    Opts1 = proplists:delete(port, Opts),
+    Opts2 = proplists:delete(dtls_port, Opts1),
+
+    lwm2m_coap_server:start_udp(lwm2m_udp_socket, Port, Opts2),
 
     CertFile = application:get_env(?APP, certfile, ""),
     KeyFile = application:get_env(?APP, keyfile, ""),
+    UdpOption = proplists:get_value(opts, Opts2, []),
     case (filelib:is_regular(CertFile) andalso filelib:is_regular(KeyFile)) of
         true ->
-            lwm2m_coap_server:start_dtls(lwm2m_dtls_socket, Port+1, [{certfile, CertFile}, {keyfile, KeyFile}]);
+            lwm2m_coap_server:start_dtls(lwm2m_dtls_socket, DtlsPort, [{certfile, CertFile}, {keyfile, KeyFile} | UdpOption]);
         false ->
             ?LOG(error, "certfile ~p or keyfile ~p are not valid, turn off coap DTLS", [CertFile, KeyFile])
     end.

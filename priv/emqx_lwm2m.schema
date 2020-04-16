@@ -1,8 +1,18 @@
 %% -*-: erlang -*-
 
-{mapping, "lwm2m.port", "emqx_lwm2m.port", [
+{mapping, "lwm2m.ip", "emqx_lwm2m.options", [
+  {datatype, string},
+  {default, "0.0.0.0"}
+]}.
+
+{mapping, "lwm2m.port", "emqx_lwm2m.options", [
   {datatype, integer},
   {default, 5683}
+]}.
+
+{mapping, "lwm2m.dtls.port", "emqx_lwm2m.options", [
+  {datatype, integer},
+  {default, 5684}
 ]}.
 
 %% defaults to 0
@@ -42,7 +52,19 @@
     {list_to_atom(Key), Value}
   end, Options),
   LB = cuttlefish:conf_get("lwm2m.lb", Conf, undefined),
-  [{lb, LB}, {opts, Opts}]
+
+  Host = cuttlefish:conf_get("lwm2m.ip", Conf),
+  ExtraOpts = case inet:parse_address(Host) of
+    {ok, {_,_,_,_} = Address} ->
+      [inet, {ip, Address}];
+    {ok, {_,_,_,_,_,_,_,_} = Address} ->
+      [inet6, {ip, Address}]
+  end,
+
+  Port = cuttlefish:conf_get("lwm2m.port", Conf),
+  DTLSPort = cuttlefish:conf_get("lwm2m.dtls.port", Conf),
+
+  [{port, Port}, {dtls_port, DTLSPort}, {lb, LB}, {opts, ExtraOpts ++ Opts}]
 end}.
 
 {mapping, "lwm2m.mountpoint", "emqx_lwm2m.mountpoint", [

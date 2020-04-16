@@ -19,6 +19,7 @@
 -compile(export_all).
 
 -define(PORT, 5683).
+-define(OPTIONS, [{port, 5683}, {dtls_port, 5684}]).
 
 -define(LOGT(Format, Args), ct:pal("TEST_SUITE: " ++ Format, Args)).
 
@@ -122,7 +123,7 @@ set_special_configs(_App) ->
     ok.
 
 init_per_testcase(_AllTestCase, Config) ->
-    application:set_env(emqx_lwm2m, port, ?PORT),
+    application:set_env(emqx_lwm2m, options, ?OPTIONS),
     application:set_env(emqx_lwm2m, xml_dir, emqx_ct_helpers:deps_path(emqx_lwm2m, "lwm2m_xml")),
     application:set_env(emqx_lwm2m, lifetime_max, 86400),
     application:set_env(emqx_lwm2m, lifetime_min, 1),
