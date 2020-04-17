@@ -1,8 +1,13 @@
 %% -*-: erlang -*-
 
-{mapping, "lwm2m.port", "emqx_lwm2m.port", [
-  {datatype, integer},
-  {default, 5683}
+{mapping, "lwm2m.bind.udp.$number", "emqx_lwm2m.bind_udp", [
+  {datatype, ip},
+  {default, "0.0.0.0:5683"}
+]}.
+
+{mapping, "lwm2m.bind.dtls.$number", "emqx_lwm2m.bind_dtls", [
+  {datatype, ip},
+  {default, "0.0.0.0:5684"}
 ]}.
 
 %% defaults to 0
@@ -36,12 +41,45 @@
   {datatype, bytesize}
 ]}.
 
+
+
+{translation, "emqx_lwm2m.bind_udp", fun(Conf) ->
+  Options = cuttlefish_variable:filter_by_prefix("lwm2m.bind.udp", Conf),
+  lists:map(fun({_, Bind}) ->
+    {Ip, Port} = cuttlefish_datatypes:from_string(Bind, ip),
+    Opts = case inet:parse_address(Ip) of
+             {ok, {_,_,_,_} = Address} ->
+               [inet, {ip, Address}];
+             {ok, {_,_,_,_,_,_,_,_} = Address} ->
+               [inet6, {ip, Address}]
+           end,
+    {Port, Opts}
+  end, Options)
+end}.
+
+{translation, "emqx_lwm2m.bind_dtls", fun(Conf) ->
+  Options = cuttlefish_variable:filter_by_prefix("lwm2m.bind.dtls", Conf),
+  lists:map(fun({_, Bind}) ->
+    {Ip, Port} = cuttlefish_datatypes:from_string(Bind, ip),
+    Opts = case inet:parse_address(Ip) of
+             {ok, {_,_,_,_} = Address} ->
+               [inet, {ip, Address}];
+             {ok, {_,_,_,_,_,_,_,_} = Address} ->
+               [inet6, {ip, Address}]
+           end,
+    {Port, Opts}
+  end, Options)
+end}.
+
+
 {translation, "emqx_lwm2m.options", fun(Conf) ->
   Options = cuttlefish_variable:filter_by_prefix("lwm2m.opts", Conf),
   Opts = lists:map(fun({[_,_, Key], Value}) ->
     {list_to_atom(Key), Value}
   end, Options),
+
   LB = cuttlefish:conf_get("lwm2m.lb", Conf, undefined),
+
   [{lb, LB}, {opts, Opts}]
 end}.
 
