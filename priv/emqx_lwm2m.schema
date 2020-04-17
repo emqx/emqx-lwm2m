@@ -5,7 +5,7 @@
   {default, "0.0.0.0:5683"}
 ]}.
 
-{mapping, "lwm2m.bind.dtls.$number", "emqx_lwm2m.options", [
+{mapping, "lwm2m.bind.dtls.$number", "emqx_lwm2m.bind_dtls", [
   {datatype, ip},
   {default, "0.0.0.0:5684"}
 ]}.
