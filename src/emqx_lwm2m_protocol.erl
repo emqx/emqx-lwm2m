@@ -101,9 +101,9 @@ init(CoapPid, EndpointName, Peername = {_Peerhost, _Port}, RegInfo = #{<<"lt">> 
             {error, Error}
     end.
 
-post_init(Lwm2mState = #lwm2m_state{endpoint_name = EndpointName,
+post_init(Lwm2mState = #lwm2m_state{endpoint_name = _EndpointName,
                                     register_info = RegInfo,
-                                    coap_pid = CoapPid}) ->
+                                    coap_pid = _CoapPid}) ->
     %% - subscribe to the downlink_topic and wait for commands
     Topic = downlink_topic(<<"register">>, Lwm2mState),
     subscribe(Topic, Lwm2mState),
@@ -196,19 +196,19 @@ clean_subscribe(CoapPid, {shutdown, Error}, SubTopic, Lwm2mState) ->
 clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
     do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState).
 
-do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
+do_clean_subscribe(_CoapPid, Error, SubTopic, Lwm2mState) ->
     ?LOG(debug, "unsubscribe ~p while exiting", [SubTopic]),
     unsubscribe(SubTopic, Lwm2mState),
 
     ConnInfo0 = conninfo(Lwm2mState),
-    ConnInfo = ConnInfo0#{disconnected_at => erlang:system_time(second)},
+    ConnInfo = ConnInfo0#{disconnected_at => erlang:system_time(millisecond)},
     run_hooks('client.disconnected', [clientinfo(Lwm2mState), Error, ConnInfo]).
 
 subscribe(Topic, Lwm2mState = #lwm2m_state{endpoint_name = EndpointName}) ->
     emqx_broker:subscribe(Topic, EndpointName, ?SUBOPTS),
     emqx_hooks:run('session.subscribed', [clientinfo(Lwm2mState), Topic, ?SUBOPTS]).
 
-unsubscribe(Topic, Lwm2mState = #lwm2m_state{endpoint_name = EndpointName}) ->
+unsubscribe(Topic, Lwm2mState = #lwm2m_state{endpoint_name = _EndpointName}) ->
     Opts = #{rh => 0, rap => 0, nl => 0, qos => 0},
     emqx_broker:unsubscribe(Topic),
     emqx_hooks:run('session.unsubscribed', [clientinfo(Lwm2mState), Topic, Opts]).
@@ -216,7 +216,7 @@ unsubscribe(Topic, Lwm2mState = #lwm2m_state{endpoint_name = EndpointName}) ->
 publish(Topic, Payload, Qos, EndpointName) ->
     emqx_broker:publish(emqx_message:set_flag(retain, false, emqx_message:make(EndpointName, Qos, Topic, Payload))).
 
-time_now() -> erlang:system_time(second).
+time_now() -> erlang:system_time(millisecond).
 
 %%--------------------------------------------------------------------
 %% Deliver downlink message to coap
