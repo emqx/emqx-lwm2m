@@ -48,11 +48,11 @@
   lists:map(fun({_, Bind}) ->
     {Ip, Port} = cuttlefish_datatypes:from_string(Bind, ip),
     Opts = case inet:parse_address(Ip) of
-    {ok, {_,_,_,_} = Address} ->
-      [inet, {ip, Address}];
-    {ok, {_,_,_,_,_,_,_,_} = Address} ->
-      [inet6, {ip, Address}]
-    end,
+             {ok, {_,_,_,_} = Address} ->
+               [inet, {ip, Address}];
+             {ok, {_,_,_,_,_,_,_,_} = Address} ->
+               [inet6, {ip, Address}]
+           end,
     {Port, Opts}
   end, Options)
 end}.
@@ -62,11 +62,11 @@ end}.
   lists:map(fun({_, Bind}) ->
     {Ip, Port} = cuttlefish_datatypes:from_string(Bind, ip),
     Opts = case inet:parse_address(Ip) of
-    {ok, {_,_,_,_} = Address} ->
-      [inet, {ip, Address}];
-    {ok, {_,_,_,_,_,_,_,_} = Address} ->
-      [inet6, {ip, Address}]
-    end,
+             {ok, {_,_,_,_} = Address} ->
+               [inet, {ip, Address}];
+             {ok, {_,_,_,_,_,_,_,_} = Address} ->
+               [inet6, {ip, Address}]
+           end,
     {Port, Opts}
   end, Options)
 end}.
