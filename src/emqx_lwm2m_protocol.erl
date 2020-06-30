@@ -445,6 +445,7 @@ chann_info(State) ->
      }.
 
 conninfo(#lwm2m_state{peername = Peername,
+                      version = Ver,
                       started_at = StartedAt,
                       endpoint_name = Epn}) ->
     #{socktype => udp,
@@ -453,7 +454,7 @@ conninfo(#lwm2m_state{peername = Peername,
       peercert => nossl,        %% TODO: dtls
       conn_mod => ?MODULE,
       proto_name => <<"LwM2M">>,
-      proto_ver => 3,
+      proto_ver => Ver,
       clean_start => true,
       clientid => Epn,
       username => undefined,
