@@ -166,12 +166,30 @@ case01_register(Config) ->
     ack = Type,
     {ok, created} = Method,
     RspId = MsgId,
-    ?assertNotEqual(undefined, proplists:get_value(location_path, Opts)),
+    Location = proplists:get_value(location_path, Opts),
+    ?assertNotEqual(undefined, Location),
 
     %% checkpoint 2 - verify subscribed topics
     timer:sleep(50),
     ?LOGT("all topics: ~p", [test_mqtt_broker:get_subscrbied_topics()]),
-    true = lists:member(SubTopic, test_mqtt_broker:get_subscrbied_topics()).
+    true = lists:member(SubTopic, test_mqtt_broker:get_subscrbied_topics()),
+
+    % ----------------------------------------
+    % DE-REGISTER command
+    % ----------------------------------------
+    ?LOGT("start to send DE-REGISTER command", []),
+    MsgId3 = 52,
+    test_send_coap_request( UdpSock,
+                            delete,
+                            sprintf("coap://127.0.0.1:~b~s", [?PORT, join_path(Location, <<>>)]),
+                            #coap_content{payload = <<>>},
+                            [],
+                            MsgId3),
+    #coap_message{type = ack, id = RspId3, method = Method3} = test_recv_coap_response(UdpSock),
+    {ok,deleted} = Method3,
+    MsgId3 = RspId3,
+    false = lists:member(SubTopic, test_mqtt_broker:get_subscrbied_topics()).
+
 
 case01_register_additional_opts(Config) ->
     % ----------------------------------------
@@ -196,12 +214,29 @@ case01_register_additional_opts(Config) ->
     Type = ack,
     Method = {ok, created},
     RspId = MsgId,
-    true = (undefined =/= proplists:get_value(location_path, Opts)),
+    Location = proplists:get_value(location_path, Opts),
+    ?assertNotEqual(undefined, Location),
 
     %% checkpoint 2 - verify subscribed topics
     timer:sleep(50),
 
-    true = lists:member(SubTopic, test_mqtt_broker:get_subscrbied_topics()).
+    true = lists:member(SubTopic, test_mqtt_broker:get_subscrbied_topics()),
+
+    % ----------------------------------------
+    % DE-REGISTER command
+    % ----------------------------------------
+    ?LOGT("start to send DE-REGISTER command", []),
+    MsgId3 = 52,
+    test_send_coap_request( UdpSock,
+                            delete,
+                            sprintf("coap://127.0.0.1:~b~s", [?PORT, join_path(Location, <<>>)]),
+                            #coap_content{payload = <<>>},
+                            [],
+                            MsgId3),
+    #coap_message{type = ack, id = RspId3, method = Method3} = test_recv_coap_response(UdpSock),
+    {ok,deleted} = Method3,
+    MsgId3 = RspId3,
+    false = lists:member(SubTopic, test_mqtt_broker:get_subscrbied_topics()).
 
 case01_register_incorrect_opts(Config) ->
     % ----------------------------------------
@@ -243,6 +278,15 @@ case01_register_report(Config) ->
                             #coap_content{content_format = <<"text/plain">>, payload = <<"</1>, </2>, </3>, </4>, </5>">>},
                             [],
                             MsgId),
+
+    #coap_message{type = Type, method = Method, id = RspId, options = Opts} =
+        test_recv_coap_response(UdpSock),
+    Type = ack,
+    Method = {ok, created},
+    RspId = MsgId,
+    Location = proplists:get_value(location_path, Opts),
+    ?assertNotEqual(undefined, Location),
+
     timer:sleep(50),
     true = lists:member(SubTopic, test_mqtt_broker:get_subscrbied_topics()),
 
@@ -256,7 +300,23 @@ case01_register_report(Config) ->
                                     <<"objectList">> => [<<"/1">>, <<"/2">>, <<"/3">>, <<"/4">>, <<"/5">>]
                                 }
                              }),
-    ?assertEqual(ReadResult, test_recv_mqtt_response(ReportTopic)).
+    ?assertEqual(ReadResult, test_recv_mqtt_response(ReportTopic)),
+
+    % ----------------------------------------
+    % DE-REGISTER command
+    % ----------------------------------------
+    ?LOGT("start to send DE-REGISTER command", []),
+    MsgId3 = 52,
+    test_send_coap_request( UdpSock,
+                            delete,
+                            sprintf("coap://127.0.0.1:~b~s", [?PORT, join_path(Location, <<>>)]),
+                            #coap_content{payload = <<>>},
+                            [],
+                            MsgId3),
+    #coap_message{type = ack, id = RspId3, method = Method3} = test_recv_coap_response(UdpSock),
+    {ok,deleted} = Method3,
+    MsgId3 = RspId3,
+    false = lists:member(SubTopic, test_mqtt_broker:get_subscrbied_topics()).
 
 case02_update_deregister(Config) ->
     % ----------------------------------------
