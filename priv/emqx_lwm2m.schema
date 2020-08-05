@@ -159,6 +159,10 @@ end}.
   {datatype, string}
 ]}.
 
+{mapping, "lwm2m.dtls.psk_ciphers", "emqx_lwm2m.dtls_opts", [
+  {datatype, string}
+]}.
+
 {translation, "emqx_lwm2m.dtls_opts", fun(Conf) ->
   Filter  = fun(Opts) -> [{K, V} || {K, V} <- Opts, V =/= undefined] end,
 
@@ -172,19 +176,32 @@ end}.
   Ciphers =
       case cuttlefish:conf_get("lwm2m.dtls.ciphers", Conf, undefined) of
           undefined ->
-              lists:foldl(
-                  fun(TlsVer, Ciphers) ->
-                      Ciphers ++ ssl:cipher_suites(all, TlsVer)
-                  end, [], ['dtlsv1', 'dtlsv1.2']);
+              [];
           C ->
-              SplitFun(C)
+              [{ciphers, SplitFun(C)}]
       end,
+  PskCiphers =
+      case cuttlefish:conf_get("lwm2m.dtls.psk_ciphers", Conf, undefined) of
+          undefined ->
+              [];
+          C2 ->
+              Psk = lists:map(fun("PSK-AES128-CBC-SHA") -> {psk, aes_128_cbc, sha};
+                                     ("PSK-AES256-CBC-SHA") -> {psk, aes_256_cbc, sha};
+                                     ("PSK-3DES-EDE-CBC-SHA") -> {psk, '3des_ede_cbc', sha};
+                                     ("PSK-RC4-SHA") -> {psk, rc4_128, sha}
+                                  end, SplitFun(C2)),
+              [{ciphers, Psk}, {user_lookup_fun, {fun emqx_psk:lookup/3, <<>>}}]
+      end,
+  Ciphers /= []
+      andalso PskCiphers /= []
+         andalso cuttlefish:invalid("The 'lwm2m.dtls.ciphers' and 'lwm2m.dtls.psk_ciphers' cannot exist simultaneously."),
+
+  NCiphers = Ciphers ++ PskCiphers,
 
   Filter([{verify, cuttlefish:conf_get("lwm2m.dtls.verify", Conf, undefined)},
           {keyfile, cuttlefish:conf_get("lwm2m.dtls.keyfile", Conf, OldKey)},
           {certfile, cuttlefish:conf_get("lwm2m.dtls.certfile", Conf, OldCert)},
           {cacertfile, cuttlefish:conf_get("lwm2m.dtls.cacertfile", Conf, undefined)},
-          {fail_if_no_peer_cert, cuttlefish:conf_get("lwm2m.dtls.fail_if_no_peer_cert", Conf, undefined)},
-          {ciphers, Ciphers}])
+          {fail_if_no_peer_cert, cuttlefish:conf_get("lwm2m.dtls.fail_if_no_peer_cert", Conf, undefined)} | NCiphers])
 end}.
 
