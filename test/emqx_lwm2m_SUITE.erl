@@ -17,6 +17,7 @@
 -module(emqx_lwm2m_SUITE).
 
 -compile(export_all).
+-compile(nowarn_export_all).
 
 -define(PORT, 5683).
 
@@ -27,7 +28,9 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
 
--define(lixiang_encode(Value), (Value)).
+%%--------------------------------------------------------------------
+%% Setups
+%%--------------------------------------------------------------------
 
 all() ->
     [ {group, test_grp_0_register}
@@ -114,13 +117,6 @@ end_per_suite(Config) ->
     emqx_ct_helpers:stop_apps([emqx]),
     Config.
 
-set_special_configs(emqx) ->
-    application:set_env(emqx, acl_file, emqx_ct_helpers:deps_path(emqx, "etc/acl.conf")),
-    application:set_env(emqx, plugins_loaded_file, emqx_ct_helpers:deps_path (emqx, "test/emqx_SUITE_data/loaded_plugins")),
-    application:set_env(emqx, license_file, emqx_ct_helpers:deps_path(emqx, "etc/emqx.lic"));
-set_special_configs(_App) ->
-    ok.
-
 init_per_testcase(_AllTestCase, Config) ->
     application:set_env(emqx_lwm2m, bind_udp, [{5683, []}]),
     application:set_env(emqx_lwm2m, bind_dtls, [{5684, []}]),
@@ -143,6 +139,10 @@ end_per_testcase(_AllTestCase, Config) ->
     emqtt:disconnect(?config(emqx_c, Config)),
     ok = application:stop(emqx_lwm2m),
     ok = application:stop(lwm2m_coap).
+
+%%--------------------------------------------------------------------
+%% Cases
+%%--------------------------------------------------------------------
 
 case01_register(Config) ->
     % ----------------------------------------
@@ -937,7 +937,7 @@ case20_single_write(Config) ->
                 <<"data">> => #{
                     <<"path">> => <<"/3/0/13">>,
                     <<"type">> => <<"Integer">>,
-                    <<"value">> => ?lixiang_encode(<<"12345">>)
+                    <<"value">> => <<"12345">>
                 }
                },
     CommandJson = emqx_json:encode(Command),
@@ -987,7 +987,7 @@ case20_write(Config) ->
                     <<"basePath">> => <<"/3/0/13">>,
                     <<"content">> => [#{
                         type => <<"Float">>,
-                        value => ?lixiang_encode(<<"12345.0">>)
+                        value => <<"12345.0">>
                     }]
                 }
                },
@@ -1039,11 +1039,11 @@ case21_write_object(Config) ->
                     <<"content">> => [#{
                         path => <<"13">>,
                         type => <<"Integer">>,
-                        value => ?lixiang_encode(<<"12345">>)
+                        value => <<"12345">>
                     },#{
                         path => <<"14">>,
                         type => <<"String">>,
-                        value => ?lixiang_encode(<<"87x">>)
+                        value => <<"87x">>
                     }]
                 }
                },
@@ -1097,7 +1097,7 @@ case22_write_error(Config) ->
                     <<"content">> => [
                         #{
                             type => <<"Integer">>,
-                            value => ?lixiang_encode(<<"12345">>)
+                            value => <<"12345">>
                         }
                     ]
                 }
