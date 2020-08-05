@@ -23,66 +23,74 @@
         ]).
 
 -define(LOG(Level, Format, Args),
-    logger:Level("LWM2M: " ++ Format, Args)).
+    logger:Level("LwM2M: " ++ Format, Args)).
 
 start() ->
-    {ok, _} = application:ensure_all_started(lwm2m_coap),
-
-    ResourceHandlers = [
-        {[<<"rd">>], emqx_lwm2m_coap_resource, undefined}
-    ],
-
+    ResourceHandlers = [{[<<"rd">>], emqx_lwm2m_coap_resource, undefined}],
     lwm2m_coap_server:start_registry(ResourceHandlers),
-
-    Opts = application:get_env(?APP, options, []),
-
-    LbOpt = proplists:get_value(lb, Opts, undefined),
-    UdpOpts = proplists:get_value(opts, Opts, []),
-
-    start_udp(LbOpt, UdpOpts),
-    start_dtls().
-
-start_udp(LbOpt, Opts) ->
-    BindUdps = application:get_env(?APP, bind_udp, [{5683, []}]),
-    lists:foreach(fun({Port, InetOpt}) ->
-        Name = process_name(lwm2m_udp_socket, Port),
-        lwm2m_coap_server:start_udp(Name, Port, [{lb, LbOpt}, {opts, InetOpt ++ Opts}])
-    end, BindUdps).
-
-start_dtls() ->
-    CertFile = application:get_env(?APP, certfile, ""),
-    KeyFile = application:get_env(?APP, keyfile, ""),
-    case (filelib:is_regular(CertFile) andalso filelib:is_regular(KeyFile)) of
-        true ->
-            BindDtls = application:get_env(?APP, bind_dtls, [{5684, []}]),
-            lists:foreach(fun({DtlsPort, InetOpt}) ->
-                Name = process_name(lwm2m_dtls_socket, DtlsPort),
-                lwm2m_coap_server:start_dtls(Name, DtlsPort, InetOpt ++ [{certfile, CertFile}, {keyfile, KeyFile}])
-            end, BindDtls);
-        false ->
-            ?LOG(error, "certfile ~p or keyfile ~p are not valid, turn off coap DTLS", [CertFile, KeyFile])
-    end.
-
-process_name(Mod, Port) ->
-    list_to_atom(atom_to_list(Mod) ++ "_" ++ integer_to_list(Port)).
+    start_listeners().
 
 stop() ->
-    stop_udp(),
-    stop_dtls(),
-    lwm2m_coap_server:stop(undefined).
+    stop_listeners().
 
-stop_udp() ->
-    BindUdps = application:get_env(?APP, bind_udp, [{5683, []}]),
-    lists:foreach(fun({Port, _}) ->
-        Name = process_name(lwm2m_udp_socket, Port),
-        lwm2m_coap_server:stop_udp(Name)
-    end, BindUdps).
+%%--------------------------------------------------------------------
+%% Internal funcs
+%%--------------------------------------------------------------------
 
-stop_dtls() ->
-    BindDtls = application:get_env(?APP, bind_dtls, [{5684, []}]),
-    lists:foreach(fun({Port, _}) ->
-        Name = process_name(lwm2m_dtls_socket, Port),
-        lwm2m_coap_server:stop_dtls(Name)
-    end, BindDtls).
+start_listeners() ->
+    lists:foreach(fun start_listener/1, listeners_confs()).
 
-% end of file
+stop_listeners() ->
+    lists:foreach(fun stop_listener/1, listeners_confs()).
+
+start_listener({Proto, ListenOn, Opts}) ->
+    case start_listener(Proto, ListenOn, Opts) of
+        {ok, _Pid} ->
+            io:format("Start lwm2m:~s listener on ~s successfully.~n",
+                      [Proto, format(ListenOn)]);
+        {error, Reason} ->
+            io:format(standard_error, "Failed to start lwm2m:~s listener on ~s - ~0p~n!",
+                      [Proto, format(ListenOn), Reason]),
+            error(Reason)
+    end.
+
+start_listener(udp, ListenOn, Opts) ->
+    lwm2m_coap_server:start_udp('lwm2m:udp', ListenOn, Opts);
+start_listener(dtls, ListenOn, Opts) ->
+    lwm2m_coap_server:start_dtls('lwm2m:dtls', ListenOn, Opts).
+
+stop_listener({Proto, ListenOn, _Opts}) ->
+    Ret = stop_listener(Proto, ListenOn),
+    case Ret of
+        ok -> io:format("Stop lwm2m:~s listener on ~s successfully.~n",
+                        [Proto, format(ListenOn)]);
+        {error, Reason} ->
+            io:format(standard_error, "Failed to stop lwm2m:~s listener on ~s - ~p~n.",
+                      [Proto, format(ListenOn), Reason])
+    end,
+    Ret.
+
+stop_listener(udp, ListenOn) ->
+    lwm2m_coap_server:stop_udp('lwm2m:udp', ListenOn);
+stop_listener(dtls, ListenOn) ->
+    lwm2m_coap_server:stop_dtls('lwm2m:dtls', ListenOn).
+
+listeners_confs() ->
+    listeners_confs(udp) ++ listeners_confs(dtls).
+
+listeners_confs(udp) ->
+    Udps = application:get_env(?APP, bind_udp, []),
+    Opts = application:get_env(?APP, options, []),
+    [{udp, Port, [{udp_options, InetOpts ++ Opts}]} || {Port, InetOpts} <- Udps];
+
+listeners_confs(dtls) ->
+    Dtls = application:get_env(?APP, bind_dtls, []),
+    Opts = application:get_env(?APP, dtls_opts, []),
+    [{dtls, Port, [{dtls_options, InetOpts ++ Opts}]} || {Port, InetOpts} <- Dtls].
+
+format(Port) when is_integer(Port) ->
+    io_lib:format("0.0.0.0:~w", [Port]);
+format({Addr, Port}) when is_list(Addr) ->
+    io_lib:format("~s:~w", [Addr, Port]);
+format({Addr, Port}) when is_tuple(Addr) ->
+    io_lib:format("~s:~w", [inet:ntoa(Addr), Port]).
