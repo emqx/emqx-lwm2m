@@ -31,8 +31,8 @@ start() ->
     ResourceHandlers = [
         {[<<"rd">>], emqx_lwm2m_coap_resource, undefined}
     ],
-    lwm2m_coap_server:start_registry(ResourceHandlers),
 
+    lwm2m_coap_server:start_registry(ResourceHandlers),
 
     Opts = application:get_env(?APP, options, []),
 
