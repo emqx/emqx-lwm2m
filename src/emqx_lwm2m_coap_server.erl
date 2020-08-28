@@ -103,7 +103,7 @@ get_lwm2m_opts(Envs) ->
     Topics = proplists:get_value(topics, Envs, []),
     [{lifetime_max, LifetimeMax},
      {lifetime_min, LifetimeMin},
-     {mountpoint, Mountpoint},
+     {mountpoint, list_to_binary(Mountpoint)},
      {port, Sockport},
      {auto_observe, AutoObserve},
      {qmode_time_window, QmodeTimeWindow},
