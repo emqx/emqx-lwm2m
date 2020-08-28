@@ -361,8 +361,8 @@ check_epn(_)         -> true.
 
 check_lifetime(undefined) -> false;
 check_lifetime(LifeTime) when is_integer(LifeTime) ->
-    Max = application:get_env(?APP, lifetime_max, 315360000),
-    Min = application:get_env(?APP, lifetime_min, 0),
+    Max = proplists:get_value(lifetime_max, lwm2m_coap_responder:options(), 315360000),
+    Min = proplists:get_value(lifetime_min, lwm2m_coap_responder:options(), 0),
     if
         LifeTime >= Min, LifeTime =< Max ->
             true;

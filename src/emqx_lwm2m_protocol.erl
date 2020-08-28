@@ -70,7 +70,7 @@ call(Pid, Msg) ->
     end.
 
 init(CoapPid, EndpointName, Peername = {_Peerhost, _Port}, RegInfo = #{<<"lt">> := LifeTime, <<"lwm2m">> := Ver}) ->
-    Mountpoint = list_to_binary(application:get_env(?APP, mountpoint, "")),
+    Mountpoint = proplists:get_value(mountpoint, lwm2m_coap_responder:options(), ""),
     Lwm2mState = #lwm2m_state{peername = Peername,
                               endpoint_name = EndpointName,
                               version = Ver,
@@ -85,7 +85,8 @@ init(CoapPid, EndpointName, Peername = {_Peerhost, _Port}, RegInfo = #{<<"lt">> 
             _ = run_hooks('client.connack', [conninfo(Lwm2mState), success], undefined),
 
             ClientInfo1 = maps:merge(ClientInfo, AuthResult),
-            ClientInfo2 = maps:put(sockport, application:get_env(emqx_lwm2m, port, 5683), ClientInfo1),
+            Sockport = proplists:get_value(port, lwm2m_coap_responder:options(), 5683),
+            ClientInfo2 = maps:put(sockport, Sockport, ClientInfo1),
             Lwm2mState1 = Lwm2mState#lwm2m_state{started_at = time_now(),
                                                  mountpoint = maps:get(mountpoint, ClientInfo2)},
             run_hooks('client.connected', [ClientInfo2, conninfo(Lwm2mState1)]),
@@ -261,7 +262,7 @@ do_send_to_broker(EventType, Payload, Lwm2mState) ->
 
 send_auto_observe(CoapPid, RegInfo) ->
     %% - auto observe the objects
-    case application:get_env(?APP, auto_observe, false) of
+    case proplists:get_value(auto_observe, lwm2m_coap_responder:options(), false) of
         true ->
             AlternatePath = maps:get(<<"alternatePath">>, RegInfo, <<"/">>),
             auto_observe(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid);
@@ -329,7 +330,7 @@ get_cached_downlink_messages() ->
 is_cache_mode(RegInfo, StartedAt) ->
     case is_psm(RegInfo) orelse is_qmode(RegInfo) of
         true ->
-            QModeTimeWind = application:get_env(?APP, qmode_time_window, 22),
+            QModeTimeWind = proplists:get_value(qmode_time_window, lwm2m_coap_responder:options(), 22),
             Now = time_now(),
             if (Now - StartedAt) >= QModeTimeWind -> true;
                 true -> false
@@ -350,13 +351,13 @@ is_qmode(_) -> false.
 %%--------------------------------------------------------------------
 
 downlink_topic(EventType, Lwm2mState = #lwm2m_state{mountpoint = Mountpoint}) ->
-    Topics = application:get_env(?APP, topics, []),
+    Topics = proplists:get_value(topics, lwm2m_coap_responder:options(), []),
     DnTopic = proplists:get_value(downlink_topic_key(EventType), Topics,
                                   default_downlink_topic(EventType)),
     take_place(mountpoint(iolist_to_binary(DnTopic), Mountpoint), Lwm2mState).
 
 uplink_topic(EventType, Lwm2mState = #lwm2m_state{mountpoint = Mountpoint}) ->
-    Topics = application:get_env(?APP, topics, []),
+    Topics = proplists:get_value(topics, lwm2m_coap_responder:options(), []),
     UpTopic = proplists:get_value(uplink_topic_key(EventType), Topics,
                                   default_uplink_topic(EventType)),
     take_place(mountpoint(iolist_to_binary(UpTopic), Mountpoint), Lwm2mState).
