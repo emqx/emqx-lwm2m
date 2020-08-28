@@ -18,30 +18,28 @@
 
 -include("emqx_lwm2m.hrl").
 
--export([ start/0
-        , stop/0
+-export([ start/1
+        , stop/1
         ]).
 
 -define(LOG(Level, Format, Args),
     logger:Level("LwM2M: " ++ Format, Args)).
 
-start() ->
-    ResourceHandlers = [{[<<"rd">>], emqx_lwm2m_coap_resource, undefined}],
-    lwm2m_coap_server:start_registry(ResourceHandlers),
-    start_listeners().
+start(Envs) ->
+    start_listeners(Envs).
 
-stop() ->
-    stop_listeners().
+stop(Envs) ->
+    stop_listeners(Envs).
 
 %%--------------------------------------------------------------------
 %% Internal funcs
 %%--------------------------------------------------------------------
 
-start_listeners() ->
-    lists:foreach(fun start_listener/1, listeners_confs()).
+start_listeners(Envs) ->
+    lists:foreach(fun start_listener/1, listeners_confs(Envs)).
 
-stop_listeners() ->
-    lists:foreach(fun stop_listener/1, listeners_confs()).
+stop_listeners(Envs) ->
+    lists:foreach(fun stop_listener/1, listeners_confs(Envs)).
 
 start_listener({Proto, ListenOn, Opts}) ->
     case start_listener(Proto, ListenOn, Opts) of
@@ -75,18 +73,18 @@ stop_listener(udp, ListenOn) ->
 stop_listener(dtls, ListenOn) ->
     lwm2m_coap_server:stop_dtls('lwm2m:dtls', ListenOn).
 
-listeners_confs() ->
-    listeners_confs(udp) ++ listeners_confs(dtls).
+listeners_confs(Envs) ->
+    listeners_confs(udp, Envs) ++ listeners_confs(dtls, Envs).
 
-listeners_confs(udp) ->
-    Udps = application:get_env(?APP, bind_udp, []),
-    Opts = application:get_env(?APP, options, []),
-    [{udp, Port, [{udp_options, InetOpts ++ Opts}]} || {Port, InetOpts} <- Udps];
+listeners_confs(udp, Envs) ->
+    Udps = proplists:get_value(bind_udp, Envs, []),
+    Opts = proplists:get_value(options, Envs, []),
+    [{udp, Port, [{udp_options, InetOpts ++ Opts}] ++ get_lwm2m_opts(Envs)} || {Port, InetOpts} <- Udps];
 
-listeners_confs(dtls) ->
-    Dtls = application:get_env(?APP, bind_dtls, []),
-    Opts = application:get_env(?APP, dtls_opts, []),
-    [{dtls, Port, [{dtls_options, InetOpts ++ Opts}]} || {Port, InetOpts} <- Dtls].
+listeners_confs(dtls, Envs) ->
+    Dtls = proplists:get_value(bind_dtls, Envs, []),
+    Opts = proplists:get_value(dtls_opts, Envs, []),
+    [{dtls, Port, [{dtls_options, InetOpts ++ Opts}] ++ get_lwm2m_opts(Envs)} || {Port, InetOpts} <- Dtls].
 
 format(Port) when is_integer(Port) ->
     io_lib:format("0.0.0.0:~w", [Port]);
@@ -94,3 +92,19 @@ format({Addr, Port}) when is_list(Addr) ->
     io_lib:format("~s:~w", [Addr, Port]);
 format({Addr, Port}) when is_tuple(Addr) ->
     io_lib:format("~s:~w", [inet:ntoa(Addr), Port]).
+
+get_lwm2m_opts(Envs) ->
+    LifetimeMax = proplists:get_value(lifetime_max, Envs, 315360000),
+    LifetimeMin = proplists:get_value(lifetime_min, Envs, 0),
+    Mountpoint = proplists:get_value(mountpoint, Envs, ""),
+    Sockport = proplists:get_value(port, Envs, 5683),
+    AutoObserve = proplists:get_value(auto_observe, Envs, []),
+    QmodeTimeWindow = proplists:get_value(qmode_time_window, Envs, []),
+    Topics = proplists:get_value(topics, Envs, []),
+    [{lifetime_max, LifetimeMax},
+     {lifetime_min, LifetimeMin},
+     {mountpoint, list_to_binary(Mountpoint)},
+     {port, Sockport},
+     {auto_observe, AutoObserve},
+     {qmode_time_window, QmodeTimeWindow},
+     {topics, Topics}].
