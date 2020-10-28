@@ -1,3 +1,4 @@
+
 %%--------------------------------------------------------------------
 %% Copyright (c) 2020 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
@@ -14,26 +15,27 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emqx_lwm2m_sup).
+-module(emqx_lwm2m_cm_sup).
 
 -behaviour(supervisor).
 
--export([ start_link/0
-        , init/1
-        ]).
+-export([start_link/0]).
 
--define(CHILD(M), {M, {M, start_link, []}, permanent, 5000, worker, [M]}).
-
+-export([init/1]).
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-init(_Args) ->
-    CmSup = #{id => emqx_lwm2m_cm_sup,
-              start => {emqx_lwm2m_cm_sup, start_link, []},
-              restart => permanent,
-              shutdown => infinity,
-              type => supervisor,
-              modules => [emqx_lwm2m_cm_sup]
-            },
-    {ok, { {one_for_all, 10, 3600}, [?CHILD(emqx_lwm2m_xml_object_db), CmSup] }}.
+init([]) ->
+    CM = #{id => emqx_lwm2m_cm,
+           start => {emqx_lwm2m_cm, start_link, []},
+           restart => permanent,
+           shutdown => 5000,
+           type => worker,
+           modules => [emqx_lwm2m_cm]},
+    SupFlags = #{strategy => one_for_one,
+                 intensity => 100,
+                 period => 10
+                },
+    {ok, {SupFlags, [CM]}}.
+
