@@ -133,5 +133,5 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %%--------------------------------------------------------------------
 
-clean_down({ChanPid, IMEI}) ->
-    unregister_channel({IMEI, ChanPid}).
+clean_down({_ChanPid, IMEI}) ->
+    unregister_channel(IMEI).
