@@ -45,10 +45,12 @@ lookup_cmd(#{ep := Ep}, Params) ->
     Path = proplists:get_value(<<"path">>, Params),
     case emqx_lwm2m_cm:lookup_cmd(Ep, Path, MsgType) of
         [] -> return({ok, []});
-        [{{IEMI, Path, MsgType}, Payload}] ->
-            Payload1 = format_cmd_content(Payload, MsgType),
+        [{{IEMI, Path, MsgType}, {Code, CodeMsg, Content}}] ->
+            Payload1 = format_cmd_content(Content, MsgType),
             return({ok, [{imei, IEMI},
                          {'msgType', IEMI},
+                         {'code', Code},
+                         {'codeMsg', CodeMsg},
                          {'path', IEMI}] ++ Payload1})
     end.
 
@@ -76,21 +78,14 @@ format(Channels) ->
          {'objectList', ObjectList}]
     end, Channels).
 
-format_cmd_content({Code, CodeMsg, Content}, MsgType) ->
-    case binary:match(Code, [<<"2.">>,<<"3.">>]) of
-      nomatch ->
-        [{'codeMsg', CodeMsg}];
-      _ ->
-        [{content, format_content(Content, MsgType)}]
-  end.
-
-format_content(Content, <<"discover">>) ->
+format_cmd_content(undefined, _MsgType) -> [];
+format_cmd_content(Content, <<"discover">>) ->
     [H | Content1] = Content,
     {_, [HObjId]} = emqx_lwm2m_coap_resource:parse_object_list(H),
     [ObjId | _]= path_list(HObjId),
     [Content2 | _] = Content1,
     {_, ObjectList} = emqx_lwm2m_coap_resource:parse_object_list(Content2),
-    case emqx_lwm2m_xml_object:get_obj_def(binary_to_integer(ObjId), true) of
+    R = case emqx_lwm2m_xml_object:get_obj_def(binary_to_integer(ObjId), true) of
         {error, _} ->
             lists:map(fun(Object) -> {Object, Object} end, ObjectList);
         ObjDefinition ->
@@ -105,9 +100,10 @@ format_content(Content, <<"discover">>) ->
                  {name, list_to_binary(emqx_lwm2m_xml_object:get_resource_name(binary_to_integer(ResId), ObjDefinition))}
                 ] ++ Operations
             end, ObjectList)
-    end;
-format_content(Content, _) ->
-    Content.
+    end,
+    [{content, R}];
+format_cmd_content(Content, _) ->
+    [{content, Content}].
 
 ntoa({0,0,0,0,0,16#ffff,AB,CD}) ->
     inet_parse:ntoa({AB bsr 8, AB rem 256, CD bsr 8, CD rem 256});
