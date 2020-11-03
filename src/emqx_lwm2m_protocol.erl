@@ -247,9 +247,7 @@ deliver_to_coap(AlternatePath, TermData, CoapPid, CacheMode, EndpointName) when 
     ?LOG(info, "SEND To CoAP, AlternatePath=~p, Data=~p", [AlternatePath, TermData]),
     {CoapRequest, Ref} = emqx_lwm2m_cmd_handler:mqtt2coap(AlternatePath, TermData),
     MsgType = maps:get(<<"msgType">>, Ref),
-    Data = maps:get(<<"data">>, Ref),
-    Path = maps:get(<<"path">>, Data),
-    emqx_lwm2m_cm:register_cmd(EndpointName, Path, MsgType),
+    emqx_lwm2m_cm:register_cmd(EndpointName, emqx_lwm2m_cmd_handler:extract_path(Ref), MsgType),
     case CacheMode of
         false ->
             do_deliver_to_coap(CoapPid, CoapRequest, Ref);
