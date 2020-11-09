@@ -45,6 +45,7 @@ lookup_cmd(#{ep := Ep}, Params) ->
     Path = proplists:get_value(<<"path">>, Params),
     case emqx_lwm2m_cm:lookup_cmd(Ep, Path, MsgType) of
         [] -> return({ok, []});
+        [{_, undefined} | _] -> return({ok, []});
         [{{IEMI, Path, MsgType}, {Code, CodeMsg, Content}}] ->
             Payload1 = format_cmd_content(Content, MsgType),
             return({ok, [{imei, IEMI},
