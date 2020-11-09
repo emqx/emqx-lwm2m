@@ -42,21 +42,27 @@ list(#{}, _Params) ->
 
 lookup_cmd(#{ep := Ep}, Params) ->
     MsgType = proplists:get_value(<<"msgType">>, Params),
-    Path = proplists:get_value(<<"path">>, Params),
-    case emqx_lwm2m_cm:lookup_cmd(Ep, Path, MsgType) of
+    Path0 = proplists:get_value(<<"path">>, Params),
+    case emqx_lwm2m_cm:lookup_cmd(Ep, Path0, MsgType) of
         [] -> return({ok, []});
         [{_, undefined} | _] -> return({ok, []});
-        [{{IEMI, Path, MsgType}, {Code, CodeMsg, Content}}] ->
+        [{{IMEI, Path, MsgType}, undefined}] ->
+            return({ok, [{imei, IMEI},
+                         {'msgType', IMEI},
+                         {'code', <<"6.01">>},
+                         {'codeMsg', <<"reply_not_received">>},
+                         {'path', Path}]});
+        [{{IMEI, Path, MsgType}, {Code, CodeMsg, Content}}] ->
             Payload1 = format_cmd_content(Content, MsgType),
-            return({ok, [{imei, IEMI},
-                         {'msgType', IEMI},
+            return({ok, [{imei, IMEI},
+                         {'msgType', IMEI},
                          {'code', Code},
                          {'codeMsg', CodeMsg},
-                         {'path', IEMI}] ++ Payload1})
+                         {'path', Path}] ++ Payload1})
     end.
 
 format(Channels) ->
-    lists:map(fun({IEMI, #{lifetime := LifeTime,
+    lists:map(fun({IMEI, #{lifetime := LifeTime,
                            peername := Peername,
                            version := Version,
                            reg_info := RegInfo}}) ->
@@ -71,7 +77,7 @@ format(Channels) ->
             end
         end, maps:get(<<"objectList">>, RegInfo)),
         {IpAddr, Port} = Peername,
-        [{imei, IEMI},
+        [{imei, IMEI},
          {lifetime, LifeTime},
          {ip_address, iolist_to_binary(ntoa(IpAddr))},
          {port, Port},
@@ -84,8 +90,12 @@ format_cmd_content(Content, <<"discover">>) ->
     [H | Content1] = Content,
     {_, [HObjId]} = emqx_lwm2m_coap_resource:parse_object_list(H),
     [ObjId | _]= path_list(HObjId),
-    [Content2 | _] = Content1,
-    {_, ObjectList} = emqx_lwm2m_coap_resource:parse_object_list(Content2),
+    ObjectList = case Content1 of
+        [Content2 | _] ->
+            {_, ObjL} = emqx_lwm2m_coap_resource:parse_object_list(Content2),
+            ObjL;
+        [] -> []
+    end,
     R = case emqx_lwm2m_xml_object:get_obj_def(binary_to_integer(ObjId), true) of
         {error, _} ->
             lists:map(fun(Object) -> {Object, Object} end, ObjectList);
