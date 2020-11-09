@@ -95,10 +95,7 @@ init(CoapPid, EndpointName, Peername = {_Peerhost, _Port}, RegInfo = #{<<"lt">> 
             erlang:send_after(2000, CoapPid, auto_observe),
 
             emqx_cm:register_channel(EndpointName, info(Lwm2mState1), stats(Lwm2mState1)),
-            emqx_lwm2m_cm:register_channel(EndpointName, #{reg_info => RegInfo,
-                                                           lifetime => LifeTime,
-                                                           version => Ver,
-                                                           peername => Peername}),
+            emqx_lwm2m_cm:register_channel(EndpointName, RegInfo, LifeTime, Ver, Peername),
 
             {ok, Lwm2mState1#lwm2m_state{life_timer = emqx_lwm2m_timer:start_timer(LifeTime, {life_timer, expired})}};
         {error, Error} ->
@@ -117,12 +114,13 @@ post_init(Lwm2mState = #lwm2m_state{endpoint_name = _EndpointName,
     Lwm2mState#lwm2m_state{mqtt_topic = Topic}.
 
 update_reg_info(NewRegInfo, Lwm2mState=#lwm2m_state{life_timer = LifeTimer, register_info = RegInfo,
-                                                    coap_pid = CoapPid}) ->
+                                                    coap_pid = CoapPid, endpoint_name = Epn}) ->
     UpdatedRegInfo = maps:merge(RegInfo, NewRegInfo),
 
     %% - report the registration info update, but only when objectList is updated.
     case NewRegInfo of
         #{<<"objectList">> := _} ->
+            emqx_lwm2m_cm:update_reg_info(Epn, NewRegInfo),
             send_to_broker(<<"update">>, #{<<"data">> => UpdatedRegInfo}, Lwm2mState);
         _ -> ok
     end,

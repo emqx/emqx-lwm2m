@@ -18,7 +18,8 @@
 
 -export([start_link/0]).
 
--export([ register_channel/2
+-export([ register_channel/5
+        , update_reg_info/2
         , unregister_channel/1
         ]).
 
@@ -60,9 +61,24 @@ start_link() ->
 %% API
 %%--------------------------------------------------------------------
 
-register_channel(IMEI, Info) ->
+register_channel(IMEI, RegInfo, LifeTime, Ver, Peername) ->
+    Info = #{
+        reg_info => RegInfo,
+        lifetime => LifeTime,
+        version => Ver,
+        peername => Peername
+    },
     true = ets:insert(?LWM2M_CHANNEL_TAB, {IMEI, Info}),
     cast({registered, {IMEI, self()}}).
+
+update_reg_info(IMEI, RegInfo) ->
+    case lookup_channel(IMEI) of
+        [{_, RegInfo0}] ->
+            true = ets:insert(?LWM2M_CHANNEL_TAB, {IMEI, RegInfo0#{reg_info => RegInfo}}),
+            ok;
+        [] ->
+            ok
+    end.
 
 unregister_channel(IMEI) when is_binary(IMEI) ->
     true = ets:delete(?LWM2M_CHANNEL_TAB, IMEI),
