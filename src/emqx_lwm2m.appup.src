@@ -1,0 +1,6 @@
+{"4.2.1",
+ [{"4.2.0", [{restart_application, emqx_lwm2m}]}
+ ],
+ [{"4.2.0", [{restart_application, emqx_lwm2m}]}
+ ]
+}.
