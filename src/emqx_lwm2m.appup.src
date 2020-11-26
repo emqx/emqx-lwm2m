@@ -2,17 +2,13 @@
 {VSN,
   [
     {"4.2.0", [
-      {restart_application, emqx_lwm2m},
-      {apply, {emqx_modules, refresh_module, [lwm2m_protocol]}},
-      {apply, {emqx_plugins, load, []}}
+      {restart_application, emqx_lwm2m}
     ]},
     {<<".*">>, []}
   ],
   [
     {"4.2.0", [
-      {restart_application, emqx_lwm2m},
-      {apply, {emqx_modules, refresh_module, [lwm2m_protocol]}},
-      {apply, {emqx_plugins, load, []}}
+      {restart_application, emqx_lwm2m}
     ]},
     {<<".*">>, []}
   ]
