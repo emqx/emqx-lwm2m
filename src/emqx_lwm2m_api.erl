@@ -25,6 +25,13 @@
             descr  => "A list of all lwm2m channel"
            }).
 
+-rest_api(#{name   => list,
+            method => 'GET',
+            path   => "/nodes/:atom:node/lwm2m_channels/",
+            func   => list,
+            descr  => "A list of lwm2m channel of a node"
+           }).
+
 -rest_api(#{name   => lookup_cmd,
             method => 'GET',
             path   => "/lookup_cmd/:bin:ep/",
@@ -32,13 +39,32 @@
             descr  => "Send a lwm2m downlink command"
            }).
 
+-rest_api(#{name   => lookup_cmd,
+            method => 'GET',
+            path   => "/nodes/:atom:node/lookup_cmd/:bin:ep/",
+            func   => lookup_cmd,
+            descr  => "Send a lwm2m downlink command of a node"
+           }).
+
 -export([ list/2
         , lookup_cmd/2
         ]).
 
+list(#{node := Node }, Params) ->
+    case Node = node() of
+        true -> list(#{}, Params);
+        _ -> rpc_call(Node, list, [#{}, Params])
+    end;
+
 list(#{}, _Params) ->
     Channels = emqx_lwm2m_cm:all_channels(),
     return({ok, format(Channels)}).
+
+lookup_cmd(#{ep := Ep, node := Node}, Params) ->
+    case Node = node() of
+        true -> lookup_cmd(#{ep => Ep}, Params);
+        _ -> rpc_call(Node, lookup_cmd, [#{ep => Ep}, Params])
+    end;
 
 lookup_cmd(#{ep := Ep}, Params) ->
     MsgType = proplists:get_value(<<"msgType">>, Params),
@@ -59,6 +85,12 @@ lookup_cmd(#{ep := Ep}, Params) ->
                          {'code', Code},
                          {'codeMsg', CodeMsg},
                          {'path', Path}] ++ Payload1})
+    end.
+
+rpc_call(Node, Fun, Args) ->
+    case rpc:call(Node, ?MODULE, Fun, Args) of
+        {badrpc, Reason} -> {error, Reason};
+        Res -> Res
     end.
 
 format(Channels) ->
