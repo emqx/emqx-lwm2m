@@ -121,8 +121,10 @@ load(BaseDir) ->
                true  -> BaseDir++"*.xml";
                false -> BaseDir++"/*.xml"
            end,
-    AllXmlFiles = filelib:wildcard(Wild),
-    load_loop(AllXmlFiles).
+    case filelib:wildcard(Wild) of
+        [] -> error(no_xml_files_found, BaseDir);
+        AllXmlFiles -> load_loop(AllXmlFiles)
+    end.
 
 load_loop([]) ->
     ok;

@@ -4,11 +4,19 @@
     {"4.2.0", [
       {restart_application, emqx_lwm2m}
     ]},
+    {"4.2.1", [
+      {load_module, emqx_lwm2m_api, brutal_purge, soft_purge, []},
+      {load_module, emqx_lwm2m_xml_object_db, brutal_purge, soft_purge, []}
+    ]},
     {<<".*">>, []}
   ],
   [
     {"4.2.0", [
       {restart_application, emqx_lwm2m}
+    ]},
+    {"4.2.1", [
+      {load_module, emqx_lwm2m_api, brutal_purge, soft_purge, []},
+      {load_module, emqx_lwm2m_xml_object_db, brutal_purge, soft_purge, []}
     ]},
     {<<".*">>, []}
   ]
