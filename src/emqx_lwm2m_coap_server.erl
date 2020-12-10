@@ -53,6 +53,7 @@ start_listener({Proto, ListenOn, Opts}) ->
         {ok, _Pid} ->
             io:format("Start lwm2m:~s listener on ~s successfully.~n",
                       [Proto, format(ListenOn)]);
+        {error, {already_started, _Pid}} -> ok;
         {error, Reason} ->
             io:format(standard_error, "Failed to start lwm2m:~s listener on ~s - ~0p~n!",
                       [Proto, format(ListenOn), Reason]),
