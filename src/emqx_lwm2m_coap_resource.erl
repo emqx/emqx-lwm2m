@@ -279,7 +279,10 @@ append_object_list(LwM2MQuery, LwM2MPayload) when is_binary(LwM2MPayload) ->
     }.
 
 parse_options(InputQuery) ->
-    parse_options(InputQuery, maps:new()).
+    case parse_options(InputQuery, maps:new()) of
+        {ok, #{<<"lwm2m">> := _}} = Query -> Query;
+        {ok, Query} -> {ok, Query#{<<"lwm2m">> => <<"1.0">>}}
+    end.
 
 parse_options([], Query) -> {ok, Query};
 parse_options([<<"ep=", Epn/binary>>|T], Query) ->
@@ -352,9 +355,9 @@ delink(Str) ->
     Ltrim = binary_util:ltrim(Str, $<),
     binary_util:rtrim(Ltrim, $>).
 
-check_lwm2m_version(<<"1">>)   -> true;
-check_lwm2m_version(<<"1.", _PatchVerNum/binary>>) -> true;
-check_lwm2m_version(_)         -> false.
+% check_lwm2m_version(<<"1">>)   -> true;
+% check_lwm2m_version(<<"1.", _PatchVerNum/binary>>) -> true;
+check_lwm2m_version(_) -> true.
 
 check_epn(undefined) -> false;
 check_epn(_)         -> true.
