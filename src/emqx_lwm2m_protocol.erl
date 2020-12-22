@@ -291,7 +291,19 @@ auto_observe(AlternatePath, ObjectList, CoapPid, EndpointName) ->
 
 observe_object_list(AlternatePath, ObjectList, CoapPid, EndpointName) ->
     lists:foreach(fun(ObjectPath) ->
-        observe_object_slowly(AlternatePath, ObjectPath, CoapPid, 100, EndpointName)
+        [ObjId| LastPath] = emqx_lwm2m_cmd_handler:path_list(ObjectPath),
+        case ObjId of
+            <<"19">> ->
+                [ObjInsId | _LastPath1] = LastPath,
+                case ObjInsId of
+                    <<"0">> ->
+                        observe_object_slowly(AlternatePath, <<"/19/0/0">>, CoapPid, 100, EndpointName);
+                    _ ->
+                        observe_object_slowly(AlternatePath, ObjectPath, CoapPid, 100, EndpointName)
+                end;
+            _ ->
+                observe_object_slowly(AlternatePath, ObjectPath, CoapPid, 100, EndpointName)
+        end
     end, ObjectList).
 
 observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Interval, EndpointName) ->
