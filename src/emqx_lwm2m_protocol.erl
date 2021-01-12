@@ -279,34 +279,20 @@ send_auto_observe(CoapPid, RegInfo, EndpointName) ->
     case proplists:get_value(auto_observe, lwm2m_coap_responder:options(), false) of
         true ->
             AlternatePath = maps:get(<<"alternatePath">>, RegInfo, <<"/">>),
-            auto_observe(AlternatePath, maps:get(<<"objectList">>, RegInfo, []), CoapPid, EndpointName);
+            ObjectList = proplists:get_value(auto_observe_list, lwm2m_coap_responder:options(), []),
+            send_auto_observe(AlternatePath, ObjectList, CoapPid, EndpointName);
         _ -> ?LOG(info, "Auto Observe Disabled", [])
     end.
 
-auto_observe(AlternatePath, ObjectList, CoapPid, EndpointName) ->
+send_auto_observe(AlternatePath, ObjectList, CoapPid, EndpointName) ->
     ?LOG(info, "Auto Observe on: ~p", [ObjectList]),
     erlang:spawn(fun() ->
-            observe_object_list(AlternatePath, ObjectList, CoapPid, EndpointName)
+            lists:foreach(fun(ObjectPath) ->
+                send_observe_object_slowly(AlternatePath, ObjectPath, CoapPid, 100, EndpointName)
+            end, ObjectList)
         end).
 
-observe_object_list(AlternatePath, ObjectList, CoapPid, EndpointName) ->
-    lists:foreach(fun(ObjectPath) ->
-        [ObjId| LastPath] = emqx_lwm2m_cmd_handler:path_list(ObjectPath),
-        case ObjId of
-            <<"19">> ->
-                [ObjInsId | _LastPath1] = LastPath,
-                case ObjInsId of
-                    <<"0">> ->
-                        observe_object_slowly(AlternatePath, <<"/19/0/0">>, CoapPid, 100, EndpointName);
-                    _ ->
-                        observe_object_slowly(AlternatePath, ObjectPath, CoapPid, 100, EndpointName)
-                end;
-            _ ->
-                observe_object_slowly(AlternatePath, ObjectPath, CoapPid, 100, EndpointName)
-        end
-    end, ObjectList).
-
-observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Interval, EndpointName) ->
+send_observe_object_slowly(AlternatePath, ObjectPath, CoapPid, Interval, EndpointName) ->
     observe_object(AlternatePath, ObjectPath, CoapPid, EndpointName),
     timer:sleep(Interval).
 
