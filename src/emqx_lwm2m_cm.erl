@@ -118,7 +118,7 @@ init([]) ->
     {ok, #{chan_pmon => emqx_pmon:new()}}.
 
 handle_call(Req, _From, State) ->
-    ?LOG(error, "Unexpected call: ~p", [Req]),
+    ?LOG(error, "Unexpected call: ~0p", [Req]),
     {reply, ignored, State}.
 
 handle_cast({registered, {IMEI, ChanPid}}, State = #{chan_pmon := PMon}) ->
@@ -126,7 +126,7 @@ handle_cast({registered, {IMEI, ChanPid}}, State = #{chan_pmon := PMon}) ->
     {noreply, State#{chan_pmon := PMon1}};
 
 handle_cast(Msg, State) ->
-    ?LOG(error, "Unexpected cast: ~p", [Msg]),
+    ?LOG(error, "Unexpected cast: ~0p", [Msg]),
     {noreply, State}.
 
 handle_info({'DOWN', _MRef, process, Pid, _Reason}, State = #{chan_pmon := PMon}) ->
@@ -136,7 +136,7 @@ handle_info({'DOWN', _MRef, process, Pid, _Reason}, State = #{chan_pmon := PMon}
     {noreply, State#{chan_pmon := PMon1}};
 
 handle_info(Info, State) ->
-    ?LOG(error, "Unexpected info: ~p", [Info]),
+    ?LOG(error, "Unexpected info: ~0p", [Info]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->

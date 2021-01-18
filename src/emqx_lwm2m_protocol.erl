@@ -132,7 +132,7 @@ update_reg_info(NewRegInfo, Lwm2mState=#lwm2m_state{life_timer = LifeTimer, regi
     UpdatedLifeTimer = emqx_lwm2m_timer:refresh_timer(
                             maps:get(<<"lt">>, UpdatedRegInfo), LifeTimer),
 
-    ?LOG(debug, "Update RegInfo to: ~p", [UpdatedRegInfo]),
+    ?LOG(debug, "Update RegInfo to: ~0p", [UpdatedRegInfo]),
     Lwm2mState#lwm2m_state{life_timer = UpdatedLifeTimer,
                            register_info = UpdatedRegInfo}.
 
@@ -150,7 +150,7 @@ replace_reg_info(NewRegInfo, Lwm2mState=#lwm2m_state{life_timer = LifeTimer,
 
     send_auto_observe(CoapPid, NewRegInfo, EndpointName),
 
-    ?LOG(debug, "Replace RegInfo to: ~p", [NewRegInfo]),
+    ?LOG(debug, "Replace RegInfo to: ~0p", [NewRegInfo]),
     Lwm2mState#lwm2m_state{life_timer = UpdatedLifeTimer,
                            register_info = NewRegInfo}.
 
@@ -172,7 +172,7 @@ deliver(#message{topic = Topic, payload = Payload},
                                   started_at = StartedAt,
                                   endpoint_name = EndpointName}) ->
     IsCacheMode = is_cache_mode(RegInfo, StartedAt),
-    ?LOG(debug, "Get MQTT message from broker, IsCacheModeNow?: ~p, Topic: ~p, Payload: ~p", [IsCacheMode, Topic, Payload]),
+    ?LOG(debug, "Get MQTT message from broker, IsCacheModeNow?: ~0p, Topic: ~0p, Payload: ~0p", [IsCacheMode, Topic, Payload]),
     AlternatePath = maps:get(<<"alternatePath">>, RegInfo, <<"/">>),
     deliver_to_coap(AlternatePath, Payload, CoapPid, IsCacheMode, EndpointName),
     Lwm2mState.
@@ -189,14 +189,14 @@ get_stats(Lwm2mState) ->
 
 terminate(Reason, Lwm2mState = #lwm2m_state{coap_pid = CoapPid, life_timer = LifeTimer,
                                             mqtt_topic = SubTopic, endpoint_name = EndpointName}) ->
-    ?LOG(debug, "process terminated: ~p", [Reason]),
+    ?LOG(debug, "process terminated: ~0p", [Reason]),
 
     emqx_cm:unregister_channel(EndpointName),
 
     is_reference(LifeTimer) andalso emqx_lwm2m_timer:cancel_timer(LifeTimer),
     clean_subscribe(CoapPid, Reason, SubTopic, Lwm2mState);
 terminate(Reason, Lwm2mState) ->
-    ?LOG(error, "process terminated: ~p, lwm2m_state: ~p", [Reason, Lwm2mState]).
+    ?LOG(error, "process terminated: ~0p, lwm2m_state: ~0p", [Reason, Lwm2mState]).
 
 clean_subscribe(_CoapPid, _Error, undefined, _Lwm2mState) -> ok;
 clean_subscribe(_CoapPid, _Error, _SubTopic, undefined) -> ok;
@@ -206,7 +206,7 @@ clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState) ->
     do_clean_subscribe(CoapPid, Error, SubTopic, Lwm2mState).
 
 do_clean_subscribe(_CoapPid, Error, SubTopic, Lwm2mState) ->
-    ?LOG(debug, "unsubscribe ~p while exiting", [SubTopic]),
+    ?LOG(debug, "unsubscribe ~0p while exiting", [SubTopic]),
     unsubscribe(SubTopic, Lwm2mState),
 
     ConnInfo0 = conninfo(Lwm2mState),
@@ -237,12 +237,12 @@ deliver_to_coap(AlternatePath, JsonData, CoapPid, CacheMode, EndpointName) when 
         deliver_to_coap(AlternatePath, TermData, CoapPid, CacheMode, EndpointName)
     catch
         C:R:Stack ->
-            ?LOG(error, "deliver_to_coap - Invalid JSON: ~p, Exception: ~p, stacktrace: ~p",
+            ?LOG(error, "deliver_to_coap - Invalid JSON: ~0p, Exception: ~0p, stacktrace: ~0p",
                 [JsonData, {C, R}, Stack])
     end;
 
 deliver_to_coap(AlternatePath, TermData, CoapPid, CacheMode, EndpointName) when is_map(TermData) ->
-    ?LOG(info, "SEND To CoAP, AlternatePath=~p, Data=~p", [AlternatePath, TermData]),
+    ?LOG(info, "SEND To CoAP, AlternatePath=~0p, Data=~0p", [AlternatePath, TermData]),
     {CoapRequest, Ref} = emqx_lwm2m_cmd_handler:mqtt2coap(AlternatePath, TermData),
     MsgType = maps:get(<<"msgType">>, Ref),
     emqx_lwm2m_cm:register_cmd(EndpointName, emqx_lwm2m_cmd_handler:extract_path(Ref), MsgType),
@@ -285,7 +285,7 @@ send_auto_observe(CoapPid, RegInfo, EndpointName) ->
     end.
 
 send_auto_observe(AlternatePath, ObjectList, CoapPid, EndpointName) ->
-    ?LOG(info, "Auto Observe on: ~p", [ObjectList]),
+    ?LOG(info, "Auto Observe on: ~0p", [ObjectList]),
     erlang:spawn(fun() ->
             lists:foreach(fun(ObjectPath) ->
                 send_observe_object_slowly(AlternatePath, ObjectPath, CoapPid, 100, EndpointName)
@@ -303,7 +303,7 @@ observe_object(AlternatePath, ObjectPath, CoapPid, EndpointName) ->
             <<"path">> => ObjectPath
         }
     },
-    ?LOG(info, "Observe ObjectPath: ~p", [ObjectPath]),
+    ?LOG(info, "Observe ObjectPath: ~0p", [ObjectPath]),
     deliver_to_coap(AlternatePath, Payload, CoapPid, false, EndpointName).
 
 do_deliver_to_coap_slowly(CoapPid, CoapRequestList, Interval) ->
@@ -315,7 +315,7 @@ do_deliver_to_coap_slowly(CoapPid, CoapRequestList, Interval) ->
         end).
 
 do_deliver_to_coap(CoapPid, CoapRequest, Ref) ->
-    ?LOG(debug, "Deliver To CoAP(~p), CoapRequest: ~p", [CoapPid, CoapRequest]),
+    ?LOG(debug, "Deliver To CoAP(~0p), CoapRequest: ~0p", [CoapPid, CoapRequest]),
     CoapPid ! {deliver_to_coap, CoapRequest, Ref}.
 
 %%--------------------------------------------------------------------
@@ -323,7 +323,7 @@ do_deliver_to_coap(CoapPid, CoapRequest, Ref) ->
 %%--------------------------------------------------------------------
 
 cache_downlink_message(CoapRequest, Ref) ->
-    ?LOG(debug, "Cache downlink coap request: ~p, Ref: ~p", [CoapRequest, Ref]),
+    ?LOG(debug, "Cache downlink coap request: ~0p, Ref: ~0p", [CoapRequest, Ref]),
     put(dl_msg_cache, [{CoapRequest, Ref} | get_cached_downlink_messages()]).
 
 flush_cached_downlink_messages(CoapPid) ->
