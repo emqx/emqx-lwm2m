@@ -276,12 +276,12 @@ do_send_to_broker(EventType, #{<<"data">> := Data} = Payload, #lwm2m_state{endpo
 
 send_auto_observe(CoapPid, RegInfo, EndpointName) ->
     %% - auto observe the objects
-    case proplists:get_value(auto_observe, lwm2m_coap_responder:options(), false) of
-        true ->
+    case proplists:get_value(auto_observe_list,
+            lwm2m_coap_responder:options(), []) of
+        [] -> ?LOG(info, "Auto Observe Disabled", []);
+        ObjectList ->
             AlternatePath = maps:get(<<"alternatePath">>, RegInfo, <<"/">>),
-            ObjectList = proplists:get_value(auto_observe_list, lwm2m_coap_responder:options(), []),
-            send_auto_observe(AlternatePath, ObjectList, CoapPid, EndpointName);
-        _ -> ?LOG(info, "Auto Observe Disabled", [])
+            send_auto_observe(AlternatePath, ObjectList, CoapPid, EndpointName)
     end.
 
 send_auto_observe(AlternatePath, ObjectList, CoapPid, EndpointName) ->
@@ -340,7 +340,7 @@ get_cached_downlink_messages() ->
     end.
 
 is_cache_mode(RegInfo, StartedAt) ->
-    case is_psm(RegInfo) orelse is_qmode(RegInfo) of
+    case is_force_qmode() orelse is_qmode(RegInfo) of
         true ->
             QModeTimeWind = proplists:get_value(qmode_time_window, lwm2m_coap_responder:options(), 22),
             Now = time_now(),
@@ -350,7 +350,8 @@ is_cache_mode(RegInfo, StartedAt) ->
         false -> false
     end.
 
-is_psm(_) -> false.
+is_force_qmode() ->
+    proplists:get_value(force_qmode, lwm2m_coap_responder:options(), false).
 
 is_qmode(#{<<"b">> := Binding}) when Binding =:= <<"UQ">>;
                                      Binding =:= <<"SQ">>;
