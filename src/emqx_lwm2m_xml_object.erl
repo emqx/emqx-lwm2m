@@ -53,7 +53,7 @@ get_object_and_resource_id(ResourceNameBinary, ObjDefinition) ->
     ResourceNameString = binary_to_list(ResourceNameBinary),
     [#xmlText{value=ObjectId}] = xmerl_xpath:string("ObjectID/text()", ObjDefinition),
     [#xmlAttribute{value=ResourceId}] = xmerl_xpath:string("Resources/Item/Name[.=\""++ResourceNameString++"\"]/../@ID", ObjDefinition),
-    ?LOG(debug, "get_object_and_resource_id ObjectId=~p, ResourceId=~p", [ObjectId, ResourceId]),
+    ?LOG(debug, "get_object_and_resource_id ObjectId=~0p, ResourceId=~0p", [ObjectId, ResourceId]),
     {ObjectId, ResourceId}.
 
 

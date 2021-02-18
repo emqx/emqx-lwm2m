@@ -52,18 +52,18 @@ coap_discover(_Prefix, _Args) ->
     [{absolute, "mqtt", []}].
 
 coap_get(ChId, [?PREFIX], Query, Content, Lwm2mState) ->
-    ?LOG(debug, "~p ~p GET Query=~p, Content=~p", [self(),ChId, Query, Content]),
+    ?LOG(debug, "~0p ~0p GET Query=~0p, Content=~0p", [self(),ChId, Query, Content]),
     {ok, #coap_content{}, Lwm2mState};
 coap_get(ChId, Prefix, Query, Content, Lwm2mState) ->
-    ?LOG(error, "ignore bad put request ChId=~p, Prefix=~p, Query=~p, Content=~p", [ChId, Prefix,  Query, Content]),
+    ?LOG(error, "ignore bad put request ChId=~0p, Prefix=~0p, Query=~0p, Content=~0p", [ChId, Prefix,  Query, Content]),
     {error, bad_request, Lwm2mState}.
 
 % LWM2M REGISTER COMMAND
 coap_post(ChId, [?PREFIX], Query, Content = #coap_content{uri_path = [?PREFIX]}, Lwm2mState) ->
-    ?LOG(debug, "~p ~p REGISTER command Query=~p, Content=~p", [self(), ChId, Query, Content]),
+    ?LOG(debug, "~0p ~0p REGISTER command Query=~0p, Content=~0p", [self(), ChId, Query, Content]),
     case parse_options(Query) of
         {error, {bad_opt, _CustomOption}} ->
-            ?LOG(error, "Reject REGISTER from ~p due to wrong option", [ChId]),
+            ?LOG(error, "Reject REGISTER from ~0p due to wrong option", [ChId]),
             {error, bad_request, Lwm2mState};
         {ok, LwM2MQuery} ->
             process_register(ChId, LwM2MQuery, Content#coap_content.payload, Lwm2mState)
@@ -71,59 +71,59 @@ coap_post(ChId, [?PREFIX], Query, Content = #coap_content{uri_path = [?PREFIX]},
 
 % LWM2M UPDATE COMMAND
 coap_post(ChId, [?PREFIX], Query, Content = #coap_content{uri_path = LocationPath}, Lwm2mState) ->
-    ?LOG(debug, "~p ~p UPDATE command location=~p, Query=~p, Content=~p", [self(), ChId, LocationPath, Query, Content]),
+    ?LOG(debug, "~0p ~0p UPDATE command location=~0p, Query=~0p, Content=~0p", [self(), ChId, LocationPath, Query, Content]),
     case parse_options(Query) of
         {error, {bad_opt, _CustomOption}} ->
-            ?LOG(error, "Reject UPDATE from ~p due to wrong option, Query=~p", [ChId, Query]),
+            ?LOG(error, "Reject UPDATE from ~0p due to wrong option, Query=~0p", [ChId, Query]),
             {error, bad_request, Lwm2mState};
         {ok, LwM2MQuery} ->
             process_update(ChId, LwM2MQuery, LocationPath, Content#coap_content.payload, Lwm2mState)
     end;
 
 coap_post(ChId, Prefix, Query, Content, Lwm2mState) ->
-    ?LOG(error, "bad post request ChId=~p, Prefix=~p, Query=~p, Content=~p", [ChId, Prefix, Query, Content]),
+    ?LOG(error, "bad post request ChId=~0p, Prefix=~0p, Query=~0p, Content=~0p", [ChId, Prefix, Query, Content]),
     {error, bad_request, Lwm2mState}.
 
 coap_put(_ChId, Prefix, Query, Content, Lwm2mState) ->
-    ?LOG(error, "put has error, Prefix=~p, Query=~p, Content=~p", [Prefix, Query, Content]),
+    ?LOG(error, "put has error, Prefix=~0p, Query=~0p, Content=~0p", [Prefix, Query, Content]),
     {error, bad_request, Lwm2mState}.
 
 % LWM2M DE-REGISTER COMMAND
 coap_delete(ChId, [?PREFIX], #coap_content{uri_path = Location}, Lwm2mState) ->
     LocationPath = binary_util:join_path(Location),
-    ?LOG(debug, "~p ~p DELETE command location=~p", [self(), ChId, LocationPath]),
+    ?LOG(debug, "~0p ~0p DELETE command location=~0p", [self(), ChId, LocationPath]),
     case get(lwm2m_context) of
         #lwm2m_context{location = LocationPath} ->
             lwm2m_coap_responder:stop(deregister),
             {ok, Lwm2mState};
         undefined ->
-            ?LOG(error, "Reject DELETE from ~p, Location: ~p not found", [ChId, Location]),
+            ?LOG(error, "Reject DELETE from ~0p, Location: ~0p not found", [ChId, Location]),
             {error, forbidden, Lwm2mState};
         TrueLocation ->
-            ?LOG(error, "Reject DELETE from ~p, Wrong Location: ~p, registered location record: ~p", [ChId, Location, TrueLocation]),
+            ?LOG(error, "Reject DELETE from ~0p, Wrong Location: ~0p, registered location record: ~0p", [ChId, Location, TrueLocation]),
             {error, not_found, Lwm2mState}
     end;
 coap_delete(_ChId, _Prefix, _Content, Lwm2mState) ->
     {error, forbidden, Lwm2mState}.
 
 coap_observe(ChId, Prefix, Name, Ack, Lwm2mState) ->
-    ?LOG(error, "unsupported observe request ChId=~p, Prefix=~p, Name=~p, Ack=~p", [ChId, Prefix, Name, Ack]),
+    ?LOG(error, "unsupported observe request ChId=~0p, Prefix=~0p, Name=~0p, Ack=~0p", [ChId, Prefix, Name, Ack]),
     {error, method_not_allowed, Lwm2mState}.
 
 coap_unobserve(Lwm2mState) ->
-    ?LOG(error, "unsupported unobserve request: ~p", [Lwm2mState]),
+    ?LOG(error, "unsupported unobserve request: ~0p", [Lwm2mState]),
     {ok, Lwm2mState}.
 
 coap_response(ChId, Ref, CoapMsgType, CoapMsgMethod, CoapMsgPayload, CoapMsgOpts, Lwm2mState) ->
-    ?LOG(info, "~p, RCV CoAP response, CoapMsgType: ~p, CoapMsgMethod: ~p, CoapMsgPayload: ~p,
-                    CoapMsgOpts: ~p, Ref: ~p",
+    ?LOG(info, "~0p, RCV CoAP response, CoapMsgType: ~0p, CoapMsgMethod: ~0p, CoapMsgPayload: ~0p,
+                    CoapMsgOpts: ~0p, Ref: ~0p",
         [ChId, CoapMsgType, CoapMsgMethod, CoapMsgPayload, CoapMsgOpts, Ref]),
     MqttPayload = emqx_lwm2m_cmd_handler:coap2mqtt(CoapMsgMethod, CoapMsgPayload, CoapMsgOpts, Ref),
     Lwm2mState2 = emqx_lwm2m_protocol:send_ul_data(maps:get(<<"msgType">>, MqttPayload), MqttPayload, Lwm2mState),
     {noreply, Lwm2mState2}.
 
 coap_ack(_ChId, Ref, Lwm2mState) ->
-    ?LOG(info, "~p, RCV CoAP Empty ACK, Ref: ~p", [_ChId, Ref]),
+    ?LOG(info, "~0p, RCV CoAP Empty ACK, Ref: ~0p", [_ChId, Ref]),
     AckRef = maps:put(<<"msgType">>, <<"ack">>, Ref),
     MqttPayload = emqx_lwm2m_cmd_handler:ack2mqtt(AckRef),
     Lwm2mState2 = emqx_lwm2m_protocol:send_ul_data(maps:get(<<"msgType">>, MqttPayload), MqttPayload, Lwm2mState),
@@ -144,7 +144,7 @@ handle_info({deliver_to_coap, CoapRequest, Ref}, Lwm2mState) ->
     {send_request, CoapRequest, Ref, Lwm2mState};
 
 handle_info({'EXIT', _Pid, Reason}, Lwm2mState) ->
-    ?LOG(info, "~p, received exit from: ~p, reason: ~p, quit now!", [self(), _Pid, Reason]),
+    ?LOG(info, "~0p, received exit from: ~0p, reason: ~0p, quit now!", [self(), _Pid, Reason]),
     {stop, Reason, Lwm2mState};
 
 handle_info(post_init, Lwm2mState) ->
@@ -163,7 +163,7 @@ handle_info({shutdown, Error}, Lwm2mState) ->
     {stop, Error, Lwm2mState};
 
 handle_info({shutdown, conflict, {ClientId, NewPid}}, Lwm2mState) ->
-    ?LOG(warning, "lwm2m '~s' conflict with ~p, shutdown", [ClientId, NewPid]),
+    ?LOG(warning, "lwm2m '~s' conflict with ~0p, shutdown", [ClientId, NewPid]),
     {stop, conflict, Lwm2mState};
 
 handle_info({suback, _MsgId, [_GrantedQos]}, Lwm2mState) ->
@@ -173,7 +173,7 @@ handle_info(emit_stats, Lwm2mState) ->
     {noreply, Lwm2mState};
 
 handle_info(Message, Lwm2mState) ->
-    ?LOG(error, "Unknown Message ~p", [Message]),
+    ?LOG(error, "Unknown Message ~0p", [Message]),
     {noreply, Lwm2mState}.
 
 
@@ -201,11 +201,11 @@ handle_call(session, _From, Lwm2mState) ->
     {reply, ok, Lwm2mState};
 
 handle_call(Request, _From, Lwm2mState) ->
-    ?LOG(error, "adapter unexpected call ~p", [Request]),
+    ?LOG(error, "adapter unexpected call ~0p", [Request]),
     {reply, ok, Lwm2mState}.
 
 handle_cast(Msg, Lwm2mState) ->
-    ?LOG(error, "unexpected cast ~p", [Msg]),
+    ?LOG(error, "unexpected cast ~0p", [Msg]),
     {noreply, Lwm2mState, hibernate}.
 
 terminate(Reason, Lwm2mState) ->
@@ -220,7 +220,7 @@ process_register(ChId, LwM2MQuery, LwM2MPayload, Lwm2mState) ->
     Ver = maps:get(<<"lwm2m">>, LwM2MQuery, undefined),
     case check_lwm2m_version(Ver) of
         false ->
-            ?LOG(error, "Reject REGISTER from ~p due to unsupported version: ~p", [ChId, Ver]),
+            ?LOG(error, "Reject REGISTER from ~0p due to unsupported version: ~0p", [ChId, Ver]),
             lwm2m_coap_responder:stop(invalid_version),
             {error, precondition_failed, Lwm2mState};
         true ->
@@ -228,7 +228,7 @@ process_register(ChId, LwM2MQuery, LwM2MPayload, Lwm2mState) ->
                 true ->
                     init_lwm2m_emq_client(ChId, LwM2MQuery, LwM2MPayload, Lwm2mState);
                 false ->
-                    ?LOG(error, "Reject REGISTER from ~p due to wrong parameters, epn=~p, lifetime=~p", [ChId, Epn, LifeTime]),
+                    ?LOG(error, "Reject REGISTER from ~0p due to wrong parameters, epn=~0p, lifetime=~0p", [ChId, Epn, LifeTime]),
                     lwm2m_coap_responder:stop(invalid_query_params),
                     {error, bad_request, Lwm2mState}
             end
@@ -240,13 +240,13 @@ process_update(ChId, LwM2MQuery, Location, LwM2MPayload, Lwm2mState) ->
         #lwm2m_context{location = LocationPath} ->
             RegInfo = append_object_list(LwM2MQuery, LwM2MPayload),
             Lwm2mState2 = emqx_lwm2m_protocol:update_reg_info(RegInfo, Lwm2mState),
-            ?LOG(info, "~p, UPDATE Success, assgined location: ~p", [ChId, LocationPath]),
+            ?LOG(info, "~0p, UPDATE Success, assgined location: ~0p", [ChId, LocationPath]),
             {ok, changed, #coap_content{}, Lwm2mState2};
         undefined ->
-            ?LOG(error, "Reject UPDATE from ~p, Location: ~p not found", [ChId, Location]),
+            ?LOG(error, "Reject UPDATE from ~0p, Location: ~0p not found", [ChId, Location]),
             {error, forbidden, Lwm2mState};
         TrueLocation ->
-            ?LOG(error, "Reject UPDATE from ~p, Wrong Location: ~p, registered location record: ~p", [ChId, Location, TrueLocation]),
+            ?LOG(error, "Reject UPDATE from ~0p, Wrong Location: ~0p, registered location record: ~0p", [ChId, Location, TrueLocation]),
             {error, not_found, Lwm2mState}
     end.
 
@@ -255,17 +255,17 @@ init_lwm2m_emq_client(ChId, LwM2MQuery = #{<<"ep">> := Epn}, LwM2MPayload, _Lwm2
     case emqx_lwm2m_protocol:init(self(), Epn, ChId, RegInfo) of
         {ok, Lwm2mState} ->
             LocationPath = assign_location_path(Epn),
-            ?LOG(info, "~p, REGISTER Success, assgined location: ~p", [ChId, LocationPath]),
+            ?LOG(info, "~0p, REGISTER Success, assgined location: ~0p", [ChId, LocationPath]),
             {ok, created, #coap_content{location_path = LocationPath}, Lwm2mState};
         {error, Error} ->
             lwm2m_coap_responder:stop(Error),
-            ?LOG(error, "~p, REGISTER Failed, error: ~p", [ChId, Error]),
+            ?LOG(error, "~0p, REGISTER Failed, error: ~0p", [ChId, Error]),
             {error, forbidden, undefined}
     end;
 init_lwm2m_emq_client(ChId, LwM2MQuery = #{<<"ep">> := Epn}, LwM2MPayload, Lwm2mState) ->
     RegInfo = append_object_list(LwM2MQuery, LwM2MPayload),
     LocationPath = assign_location_path(Epn),
-    ?LOG(info, "~p, RE-REGISTER Success, location: ~p", [ChId, LocationPath]),
+    ?LOG(info, "~0p, RE-REGISTER Success, location: ~0p", [ChId, LocationPath]),
     Lwm2mState2 = emqx_lwm2m_protocol:replace_reg_info(RegInfo, Lwm2mState),
     {ok, created, #coap_content{location_path = LocationPath}, Lwm2mState2}.
 
@@ -293,10 +293,10 @@ parse_options([<<"b=", Binding/binary>>|T], Query) ->
 parse_options([CustomOption|T], Query) ->
     case binary:split(CustomOption, <<"=">>) of
         [OptKey, OptValue] when OptKey =/= <<>> ->
-            ?LOG(debug, "non-standard option: ~p", [CustomOption]),
+            ?LOG(debug, "non-standard option: ~0p", [CustomOption]),
             parse_options(T, maps:put(OptKey, OptValue, Query));
         _BadOpt ->
-            ?LOG(error, "bad option: ~p", [CustomOption]),
+            ?LOG(error, "bad option: ~0p", [CustomOption]),
             {error, {bad_opt, CustomOption}}
     end.
 

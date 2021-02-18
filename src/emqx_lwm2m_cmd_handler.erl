@@ -108,7 +108,7 @@ coap_read_to_mqtt({ok, SuccessCode}, CoapPayload, Format, Ref) ->
     catch
         error:not_implemented -> make_response(not_implemented, Ref);
         C:R:Stack ->
-            ?LOG(error, "~p, bad payload format: ~p, stacktrace: ~p", [{C, R}, CoapPayload, Stack]),
+            ?LOG(error, "~0p, bad payload format: ~0p, stacktrace: ~0p", [{C, R}, CoapPayload, Stack]),
             make_response(bad_request, Ref)
     end.
 

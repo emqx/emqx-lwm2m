@@ -80,21 +80,21 @@ tlv_single_resource(Id, Value, ObjDefinition) ->
     [#{K=>V}].
 
 basename(OldBaseName, ObjectId, ObjectInstanceId, ResourceId, 3) ->
-    ?LOG(debug, "basename3 OldBaseName=~p, ObjectId=~p, ObjectInstanceId=~p, ResourceId=~p", [OldBaseName, ObjectId, ObjectInstanceId, ResourceId]),
+    ?LOG(debug, "basename3 OldBaseName=~0p, ObjectId=~0p, ObjectInstanceId=~0p, ResourceId=~0p", [OldBaseName, ObjectId, ObjectInstanceId, ResourceId]),
     case binary:split(binary_util:trim(OldBaseName, $/), [<<$/>>], [global]) of
         [ObjId, ObjInsId, ResId] -> <<$/, ObjId/binary, $/, ObjInsId/binary, $/, ResId/binary>>;
         [ObjId, ObjInsId] -> <<$/, ObjId/binary, $/, ObjInsId/binary, $/, (integer_to_binary(ResourceId))/binary>>;
         [ObjId] -> <<$/, ObjId/binary, $/, (integer_to_binary(ObjectInstanceId))/binary, $/, (integer_to_binary(ResourceId))/binary>>
     end;
 basename(OldBaseName, ObjectId, ObjectInstanceId, ResourceId, 2) ->
-    ?LOG(debug, "basename2 OldBaseName=~p, ObjectId=~p, ObjectInstanceId=~p, ResourceId=~p", [OldBaseName, ObjectId, ObjectInstanceId, ResourceId]),
+    ?LOG(debug, "basename2 OldBaseName=~0p, ObjectId=~0p, ObjectInstanceId=~0p, ResourceId=~0p", [OldBaseName, ObjectId, ObjectInstanceId, ResourceId]),
     case binary:split(binary_util:trim(OldBaseName, $/), [<<$/>>], [global]) of
         [ObjId, ObjInsId, _ResId] -> <<$/, ObjId/binary, $/, ObjInsId/binary>>;
         [ObjId, ObjInsId] -> <<$/, ObjId/binary, $/, ObjInsId/binary>>;
         [ObjId] -> <<$/, ObjId/binary, $/, (integer_to_binary(ObjectInstanceId))/binary>>
     end;
 basename(OldBaseName, ObjectId, ObjectInstanceId, ResourceId, 1) ->
-    ?LOG(debug, "basename1 OldBaseName=~p, ObjectId=~p, ObjectInstanceId=~p, ResourceId=~p", [OldBaseName, ObjectId, ObjectInstanceId, ResourceId]),
+    ?LOG(debug, "basename1 OldBaseName=~0p, ObjectId=~0p, ObjectInstanceId=~0p, ResourceId=~0p", [OldBaseName, ObjectId, ObjectInstanceId, ResourceId]),
     case binary:split(binary_util:trim(OldBaseName, $/), [<<$/>>], [global]) of
         [ObjId, _ObjInsId, _ResId]       -> <<$/, ObjId/binary>>;
         [ObjId, _ObjInsId]               -> <<$/, ObjId/binary>>;
@@ -156,7 +156,7 @@ value(Value, ResourceId, ObjDefinition) ->
 
 
 encode_json(BaseName, E) ->
-    ?LOG(debug, "encode_json BaseName=~p, E=~p", [BaseName, E]),
+    ?LOG(debug, "encode_json BaseName=~0p, E=~0p", [BaseName, E]),
     #{bn=>BaseName, e=>E}.
 
 json_to_tlv([_ObjectId, _ObjectInstanceId, ResourceId], ResourceArray) ->
@@ -225,7 +225,7 @@ value_ex(K, Value) when K =:= <<"ov">>; K =:= ov ->
     <<(binary_to_integer(P1)):16, (binary_to_integer(P2)):16>>.
 
 insert_resource_into_object([ObjectInstanceId|OtherIds], Value, Acc) ->
-    ?LOG(debug, "insert_resource_into_object1 ObjectInstanceId=~p, OtherIds=~p, Value=~p, Acc=~p", [ObjectInstanceId, OtherIds, Value, Acc]),
+    ?LOG(debug, "insert_resource_into_object1 ObjectInstanceId=~0p, OtherIds=~0p, Value=~0p, Acc=~0p", [ObjectInstanceId, OtherIds, Value, Acc]),
     case find_obj_instance(ObjectInstanceId, Acc) of
         undefined ->
             NewList = insert_resource_into_object_instance(OtherIds, Value, []),
@@ -237,7 +237,7 @@ insert_resource_into_object([ObjectInstanceId|OtherIds], Value, Acc) ->
     end.
 
 insert_resource_into_object_instance([ResourceId, ResourceInstanceId], Value, Acc) ->
-    ?LOG(debug, "insert_resource_into_object_instance1() ResourceId=~p, ResourceInstanceId=~p, Value=~p, Acc=~p", [ResourceId, ResourceInstanceId, Value, Acc]),
+    ?LOG(debug, "insert_resource_into_object_instance1() ResourceId=~0p, ResourceInstanceId=~0p, Value=~0p, Acc=~0p", [ResourceId, ResourceInstanceId, Value, Acc]),
     case find_resource(ResourceId, Acc) of
         undefined ->
             NewList = insert_resource_instance_into_resource(ResourceInstanceId, Value, []),
@@ -248,7 +248,7 @@ insert_resource_into_object_instance([ResourceId, ResourceInstanceId], Value, Ac
             Acc2 ++ [Resource#{value=>NewList}]
     end;
 insert_resource_into_object_instance([ResourceId], Value, Acc) ->
-    ?LOG(debug, "insert_resource_into_object_instance2() ResourceId=~p, Value=~p, Acc=~p", [ResourceId, Value, Acc]),
+    ?LOG(debug, "insert_resource_into_object_instance2() ResourceId=~0p, Value=~0p, Acc=~0p", [ResourceId, Value, Acc]),
     NewMap = #{tlv_resource_with_value=>integer(ResourceId), value=>Value},
     case find_resource(ResourceId, Acc) of
         undeinfed ->
@@ -259,7 +259,7 @@ insert_resource_into_object_instance([ResourceId], Value, Acc) ->
     end.
 
 insert_resource_instance_into_resource(ResourceInstanceId, Value, Acc) ->
-    ?LOG(debug, "insert_resource_instance_into_resource() ResourceInstanceId=~p, Value=~p, Acc=~p", [ResourceInstanceId, Value, Acc]),
+    ?LOG(debug, "insert_resource_instance_into_resource() ResourceInstanceId=~0p, Value=~0p, Acc=~0p", [ResourceInstanceId, Value, Acc]),
     NewMap = #{tlv_resource_instance=>integer(ResourceInstanceId), value=>Value},
     case find_resource_instance(ResourceInstanceId, Acc) of
         undeinfed ->

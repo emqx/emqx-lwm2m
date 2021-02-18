@@ -42,6 +42,6 @@ refresh_timer(NewInterval, State=#timer_state{message = Msg}) ->
 
 %% start timer in seconds
 start_timer(Interval, Msg) ->
-    ?LOG(debug, "start_timer of ~p secs", [Interval]),
+    ?LOG(debug, "start_timer of ~0p secs", [Interval]),
     TRef = erlang:send_after(timer:seconds(Interval), self(), Msg),
     #timer_state{interval = Interval, tref = TRef, message = Msg}.

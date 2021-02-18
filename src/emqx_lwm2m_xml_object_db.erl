@@ -134,7 +134,7 @@ load_loop([FileName|T]) ->
     [#xmlText{value=Name}] = xmerl_xpath:string("Name/text()", ObjectXml),
     ObjectId = list_to_integer(ObjectIdString),
     NameBinary = list_to_binary(Name),
-    ?LOG(debug, "load_loop FileName=~p, ObjectId=~p, Name=~p", [FileName, ObjectId, NameBinary]),
+    ?LOG(debug, "load_loop FileName=~0p, ObjectId=~0p, Name=~0p", [FileName, ObjectId, NameBinary]),
     ets:insert(?LWM2M_OBJECT_DEF_TAB, {ObjectId, ObjectXml}),
     ets:insert(?LWM2M_OBJECT_NAME_TO_ID_TAB, {NameBinary, ObjectId}),
     load_loop(T).

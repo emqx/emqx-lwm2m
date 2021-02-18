@@ -197,7 +197,7 @@ The MQTT message will be translated to an LwM2M DISCOVER command and sent to the
           ```
           - {?ResourceName}: String, LwM2M resource description, e.g. "Available Power Sources"
           - {?ValueType}: String, can be: "Time", "String", "Integer", "Float", "Boolean", "Opaque", "Objlnk"
-          - {?Value}: Value of resource, depends on the {?ValueType}.
+          - {?Value}: Value of resource, depends on the {?ValueType}. Note that if {?ValueType} = "Opaque", {?Value} is base64 encoded.
 
 - **The response of LwM2M will be converted to following MQTT message:**
   - **Method:** PUBLISH
@@ -272,7 +272,7 @@ The MQTT message will be translated to an LwM2M DISCOVER command and sent to the
         - {?ResourceName}: String, LwM2M resource description, e.g. "Available Power Sources"
         - {?ResourcePath}: String, LwM2M resource full path. e.g. "3/0", "/3/0/0", "/3/0/6/0"
         - {?ValueType}: String, can be: "Time", "String", "Integer", "Float", "Boolean", "Opaque", "Objlnk"
-        - {?Value}: Value of the resource, depends on "type".
+        - {?Value}: Value of the resource, depends on {?ValueType}. Note that if {?ValueType} = "Opaque", {?Value} is base64 encoded.
 
     - **If {?MsgType} = "ack", "data" does not exists**
 

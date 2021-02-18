@@ -71,7 +71,7 @@ stop_listener({Proto, ListenOn, _Opts}) ->
         ok -> io:format("Stop lwm2m:~s listener on ~s successfully.~n",
                         [Proto, format(ListenOn)]);
         {error, Reason} ->
-            io:format(standard_error, "Failed to stop lwm2m:~s listener on ~s - ~p~n.",
+            io:format(standard_error, "Failed to stop lwm2m:~s listener on ~s - ~0p~n.",
                       [Proto, format(ListenOn), Reason])
     end,
     Ret.
