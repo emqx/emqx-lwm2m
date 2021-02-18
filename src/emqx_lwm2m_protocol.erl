@@ -117,12 +117,16 @@ update_reg_info(NewRegInfo, Lwm2mState=#lwm2m_state{life_timer = LifeTimer, regi
                                                     coap_pid = CoapPid, endpoint_name = Epn}) ->
     UpdatedRegInfo = maps:merge(RegInfo, NewRegInfo),
 
-    %% - report the registration info update, but only when objectList is updated.
-    case NewRegInfo of
-        #{<<"objectList">> := _} ->
-            emqx_lwm2m_cm:update_reg_info(Epn, NewRegInfo),
-            send_to_broker(<<"update">>, #{<<"data">> => UpdatedRegInfo}, Lwm2mState);
-        _ -> ok
+    case proplists:get_value(publish_update_when, lwm2m_coap_responder:options(), object_list_changed) of
+        always ->
+            update_reg_info_and_publish(Epn, UpdatedRegInfo, Lwm2mState);
+        _ ->
+            %% - report the registration info update, but only when objectList is updated.
+            case NewRegInfo of
+                #{<<"objectList">> := _} ->
+                    update_reg_info_and_publish(Epn, UpdatedRegInfo, Lwm2mState);
+                _ -> ok
+            end
     end,
 
     %% - flush cached donwlink commands
@@ -226,6 +230,10 @@ publish(Topic, Payload, Qos, EndpointName) ->
     emqx_broker:publish(emqx_message:set_flag(retain, false, emqx_message:make(EndpointName, Qos, Topic, Payload))).
 
 time_now() -> erlang:system_time(millisecond).
+
+update_reg_info_and_publish(Epn, UpdatedRegInfo, Lwm2mState) ->
+    emqx_lwm2m_cm:update_reg_info(Epn, UpdatedRegInfo),
+    send_to_broker(<<"update">>, #{<<"data">> => UpdatedRegInfo}, Lwm2mState).
 
 %%--------------------------------------------------------------------
 %% Deliver downlink message to coap
